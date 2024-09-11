@@ -1,26 +1,31 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
 
 
-def figure_eight(Mq, L, g, Ms, R, Mprop, Mm, ):
+def figure_eight(Mq, L, g, Ms, R, Mprop, Mm ):
     pass
 
 
-def nonlinear_dynamics(t, state, inputs):
+def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
     """Non-linear dynamics for the quadrotor
 
     Args:
-        t (_type_): _description_
         state (array): A vector of the current state of the quadrotor
         inputs (dictionary): A dictionary of the input forces into the quadrotor
+        g (float): The constant for gravity
+        m (float): The mass of the quadrotor
+        Jx (float): The moment of inertia in the x direction
+        Jy (float): The moment of inertia in the y direction
+        Jz (float): The moment of inertia in the z direction
 
     Returns:
         _type_: _description_
 
     State variables are Linear position, Linear Velocities, Attitude, and Angular Velocities:
         Px, Py, Pz -> These are the linear position coordinates of the quadrotor
-        u, v, q -> These are the linear velocities of the quadrotor
+        u, v, w -> These are the linear velocities of the quadrotor
         phi, theta, psi -> These are the Attitude values of the quadrotor (tilt/position)
         p, q, r -> These are the angular velocities of the quadrotor
 
@@ -37,6 +42,14 @@ def nonlinear_dynamics(t, state, inputs):
     TauPhi = inputs['Roll']
     TauTheta = inputs['Pitch']
     TauPsi = inputs['Yaw']
+
+    #Calculating the non-linear change dynamics for linear velocities
+    xDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
+    yDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
+    zDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / m)
+
+    #Calculating the non-linear change dynamics for angular velocities
+    pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
     
     
 def linear_dynamics(t, state, inputs):
@@ -104,40 +117,41 @@ def integral_controller(targetState, state, integral, K, Kc):
     """
     return -K @ (state - targetState) - Kc @ integral
 
-# Figure-8 trajectory
+
+
 def figure_8_trajectory(t, A, B, omega, z0):
     x = A * np.sin(omega * t)
     y = B * np.sin(2 * omega * t)
     z = z0
     return np.array([x, y, z])
 
-# Simulation
+
+
 def simulate_nonlinear(u_func, t_span, y0):
     sol = solve_ivp(nonlinear_dynamics, t_span, y0, args=(u_func,), dense_output=True)
     return sol
+
 
 def simulate_linear(u_func, t_span, y0):
     sol = solve_ivp(linear_dynamics, t_span, y0, args=(u_func,), dense_output=True)
     return sol
 
-# Main simulation function
+
 def simulate_quadrotor():
-    # Initial state (at rest)
+    #Initial state of the quadrtor at rest
     y0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     
-    # Time span
+    #The time span
     t_span = [0, 10]
     
-    # Control input (example feedforward control)
+    #The inputs into the quadrotor
     u_func = lambda t: feedforward_controller([0, 0, 1, 0], y0, K)
     
-    # Simulate nonlinear dynamics
+    #Simulating dynamics
     sol_nonlinear = simulate_nonlinear(u_func, t_span, y0)
-    
-    # Simulate linear dynamics
     sol_linear = simulate_linear(u_func, t_span, y0)
     
-    # Plot results
+
     plt.figure()
     plt.plot(sol_nonlinear.t, sol_nonlinear.y[2], label='Nonlinear z(t)')
     plt.plot(sol_linear.t, sol_linear.y[2], label='Linear z(t)')
@@ -146,23 +160,6 @@ def simulate_quadrotor():
     plt.legend()
     plt.show()
 
-# Figure-8 movement simulation
-def simulate_figure_8():
-    A = 2
-    B = 1
-    omega = 0.5
-    z0 = 1
-    
-    t_vals = np.linspace(0, 10, 500)
-    trajectory = np.array([figure_8_trajectory(t, A, B, omega, z0) for t in t_vals])
-    
-    plt.figure()
-    plt.plot(trajectory[:, 0], trajectory[:, 1], label="Figure-8 Path")
-    plt.xlabel('X (m)')
-    plt.ylabel('Y (m)')
-    plt.title("Quadrotor Figure-8 Path")
-    plt.legend()
-    plt.show()
 
 
 if __name__ == '__main__':
@@ -196,6 +193,12 @@ if __name__ == '__main__':
     #Moment of inertia for z direction
     Jz = ((2 * Ms * R**2) / 5) + (4 * L**2 * Mm)
 
+    inputs = {}
+    inputs['Force'] = 0
+    inputs['Roll'] = 1
+    inputs['Pitch'] = 1
+    inputs['Yaw'] = 1
+
     # Run simulation
     simulate_quadrotor()
-    simulate_figure_8()
+
