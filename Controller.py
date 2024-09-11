@@ -21,7 +21,7 @@ def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
         Jz (float): The moment of inertia in the z direction
 
     Returns:
-        _type_: _description_
+        array: A vector of change dynamics
 
     State variables are Linear position, Linear Velocities, Attitude, and Angular Velocities:
         Px, Py, Pz -> These are the linear position coordinates of the quadrotor
@@ -50,6 +50,10 @@ def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
 
     #Calculating the non-linear change dynamics for angular velocities
     pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
+    qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
+    rDot = (((Jx - Jy) / Jz) * q * q) + ((1 / Jz) * TauPsi)
+
+    return [xDot, yDot, zDot, pDot, qDot, rDot]
     
     
 def linear_dynamics(t, state, inputs):
@@ -118,12 +122,25 @@ def integral_controller(targetState, state, integral, K, Kc):
     return -K @ (state - targetState) - Kc @ integral
 
 
-
 def figure_8_trajectory(t, A, B, omega, z0):
-    x = A * np.sin(omega * t)
-    y = B * np.sin(2 * omega * t)
-    z = z0
-    return np.array([x, y, z])
+    """The figure eight dynamics given by Dr. Romagnoli in the project writeup
+
+    Args:
+        t (float): The time steps of the simulation
+        A (float): The amplitude along the x-axis
+        B (_type_): The amplitude along the y-axis
+        omega (float):  The angular velocity
+        z0 (float): The constant altitude
+
+    Returns:
+        array: A vector of the trajectory
+    """
+
+    x_t = A * np.sin(omega * t)
+    y_t = B * np.sin(2 * omega * t)
+    z_t = z0
+
+    return np.array([x_t, y_t, z_t])
 
 
 
