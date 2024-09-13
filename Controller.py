@@ -1,11 +1,7 @@
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
-
-
-def figure_eight(Mq, L, g, Ms, R, Mprop, Mm ):
-    pass
+import matplotlib.pyplot as plt
+import pandas as pd
 
 
 def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
@@ -35,9 +31,10 @@ def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
         TauTheta -> Pitch torque
         TauPsi -> Yaw torque
     """
+    #Unpacking the variables of the state
     Px, Py, Pz, u, v, w, phi, theta, psi, p, q, r = state
     
-    
+    #Obtaining the inputs into the quadrotor
     F = inputs['Force']
     TauPhi = inputs['Roll']
     TauTheta = inputs['Pitch']
@@ -52,6 +49,7 @@ def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
     pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
     qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
     rDot = (((Jx - Jy) / Jz) * q * q) + ((1 / Jz) * TauPsi)
+    
 
     return [xDot, yDot, zDot, pDot, qDot, rDot]
     
@@ -90,7 +88,8 @@ def feedforward_controller(targetState, state, K):
     Args:
         targetState (array): A vector representing the target (goal) state of the quadrotor
         state (array): A vector representing the current state of the quadrotor
-        K (nd-array): A multi-dimensional array (matrix) of feedback
+        K (nd-array): A multi-dimensional array (matrix) of feedback. K is determined through
+                      LQR or other optimization methods (given to us by Dr. Romagnoli)
 
     Returns:
         array: A new vector to adjust inputs
@@ -122,8 +121,10 @@ def integral_controller(targetState, state, integral, K, Kc):
     return -K @ (state - targetState) - Kc @ integral
 
 
+#This is the goal of the program
 def figure_8_trajectory(t, A, B, omega, z0):
-    """The figure eight dynamics given by Dr. Romagnoli in the project writeup
+    """The figure eight dynamics given by Dr. Romagnoli in the project writeup. The goal is to get the quadrotor
+       to follow a figure eight trajectory.
 
     Args:
         t (float): The time steps of the simulation
@@ -137,44 +138,78 @@ def figure_8_trajectory(t, A, B, omega, z0):
     """
 
     x_t = A * np.sin(omega * t)
+
     y_t = B * np.sin(2 * omega * t)
+
     z_t = z0
 
     return np.array([x_t, y_t, z_t])
 
 
 
-def simulate_nonlinear(u_func, t_span, y0):
-    sol = solve_ivp(nonlinear_dynamics, t_span, y0, args=(u_func,), dense_output=True)
+def simulate_nonlinear(u_func, t_span, y0, state, inputs, g, m, Jx, Jy, Jz):
+    sol = solve_ivp(nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz), t_span, y0, args=(u_func,), dense_output=True)
     return sol
 
 
-def simulate_linear(u_func, t_span, y0):
-    sol = solve_ivp(linear_dynamics, t_span, y0, args=(u_func,), dense_output=True)
+def simulate_linear(u_func, t_span, y0, state, inputs):
+    sol = solve_ivp(linear_dynamics(state, inputs), t_span, y0, args=(u_func,), dense_output=True)
     return sol
 
 
 def simulate_quadrotor():
-    #Initial state of the quadrtor at rest
-    y0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    #Initial state of the quadrtor at rest, has no velocity or positive position coordinates
+    initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     
     #The time span
-    t_span = [0, 10]
+    time_span = [0, 10]
+
+    #The control matrix K
+    #K = [[], [], [], []]
     
     #The inputs into the quadrotor
-    u_func = lambda t: feedforward_controller([0, 0, 1, 0], y0, K)
+    #These are the coordinates we want the quadrotor to go to and hover at (the desired state)
+    desired_coordinates = [2, 3, 4, 2, 2, 2, 3, 4, 2, 2, 1, 2]
+
+    u_func = lambda t: feedforward_controller(desired_coordinates, initial_state, K)
     
     #Simulating dynamics
-    sol_nonlinear = simulate_nonlinear(u_func, t_span, y0)
-    sol_linear = simulate_linear(u_func, t_span, y0)
+    sol_nonlinear = simulate_nonlinear(u_func, time_span, initial_state)
+    sol_linear = simulate_linear(u_func, time_span, initial_state)
     
-
     plt.figure()
     plt.plot(sol_nonlinear.t, sol_nonlinear.y[2], label='Nonlinear z(t)')
     plt.plot(sol_linear.t, sol_linear.y[2], label='Linear z(t)')
     plt.xlabel('Time (s)')
     plt.ylabel('Height (m)')
     plt.legend()
+    plt.show()
+
+
+def simulate_figure_8():
+    """This function simulates the figure-eight trajectory of the quadrotor
+    """
+    #2 meter amplitude along x-axis
+    A = 2
+    #1-meter amplitude along y-axis
+    B = 1
+    #0.5 rad/seconds angular velocity
+    omega = 0.5
+    #constant altitude of 1 meter
+    z0 = 1
+    
+    #5000 timesteps inbetween 0 and 10 seconds
+    time_interval_range = np.linspace(0, 20, 5000)
+
+    #Obtaining the coordinates (trajectory) for each timestep in time_interval_range
+    trajectory = np.array([figure_8_trajectory(t, A, B, omega, z0) for t in time_interval_range])
+    
+    #Plotting the result
+    plt.figure()
+    plt.plot(trajectory[:, 0], trajectory[:, 1], label="Path of Quadrotor in Figure Eight")
+    plt.xlabel('X meters')
+    plt.ylabel('Y meters')
+    plt.suptitle("Quadrotor Figure-8 Path")
     plt.show()
 
 
@@ -216,6 +251,6 @@ if __name__ == '__main__':
     inputs['Pitch'] = 1
     inputs['Yaw'] = 1
 
-    # Run simulation
-    simulate_quadrotor()
+    #Run simulation
+    simulate_figure_8()
 
