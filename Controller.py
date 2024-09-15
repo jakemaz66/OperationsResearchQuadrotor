@@ -7,11 +7,15 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
-    """Non-linear dynamics for the quadrotor
+    """Modeling the non-linear dynamics of the quadrotor. The non-linear dynamics tell you how
+       the state of the quadrotor changes with regards to three things
+       1. The current state of the quadrotor
+       2. The input controls into the quadrotor
+       3. The current forces of physics
 
     Args:
         state (array): A vector of the current state of the quadrotor
-        inputs (dictionary): A dictionary of the input forces into the quadrotor
+        inputs (dictionary): A dictionary defining the input forces, will get transformed into vector
         g (float): The constant for gravity
         m (float): The mass of the quadrotor
         Jx (float): The moment of inertia in the x direction
@@ -19,7 +23,7 @@ def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
         Jz (float): The moment of inertia in the z direction
 
     Returns:
-        array: A vector of change dynamics
+        array: An array defining the change in the state for each dimension of the quadrotor
 
     State variables are Linear position, Linear Velocities, Attitude, and Angular Velocities:
         Px, Py, Pz -> These are the linear position coordinates of the quadrotor
@@ -32,7 +36,9 @@ def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
         TauPhi -> Roll torque
         TauTheta -> Pitch torque
         TauPsi -> Yaw torque
+    This produces an input array of type [F, TauPhim TauTheta, TauPsi]
     """
+
     #Unpacking the variables of the state
     Px, Py, Pz, u, v, w, phi, theta, psi, p, q, r = state
     
@@ -43,33 +49,53 @@ def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
     TauPsi = inputs['Yaw']
 
     #Calculating the non-linear change dynamics for linear velocities
-    xDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
-    yDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
-    zDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / m)
+    uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
+    vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
+    wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / m)
 
     #Calculating the non-linear change dynamics for angular velocities
     pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
     qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
     rDot = (((Jx - Jy) / Jz) * q * q) + ((1 / Jz) * TauPsi)
+
+    #Calculating the non-linear change dynamics for angular positions
+    phiDot = (1 * p) + (np.sin(phi) * np.tan(theta) * q) + (np.cos(phi) * np.tan(theta) * r)
+    thetaDot = (0 * p) + (np.cos(theta) * q) + (-np.sin(phi) * r)
+    psiDot = (0 * p) + (np.sin(phi) / np.cos(theta) * q) + (np.cos(phi) / np.cos(theta) * r)
+
+    #Calculating the non-linear change dynamics for linear positions
+    pDotx = (u * np.cos(theta) * np.cos(psi)) + (v * (np.sin(phi) * np.sin(theta) * np.cos(psi)) - (np.cos(phi) * np.sin(psi))) + \
+    (w * (np.cos(phi) * np.sin(theta) * np.cos(psi)) - (np.sin(phi) * np.sin(psi)))
+
+    pDoty = (u * np.cos(theta) * np.cos(psi)) + (v * (np.sin(phi) * np.sin(theta) * np.cos(psi)) - (np.cos(phi) * np.sin(psi))) + \
+    (w * (np.cos(phi) * np.sin(theta) * np.cos(psi)) - (np.sin(phi) * np.sin(psi)))
+
+    pDotz = (0 * p) + (np.sin(phi) / np.cos(theta) * q) + (np.cos(phi) / np.cos(theta) * r)
     
-    return [u, v, w, xDot, yDot, zDot, pDot, qDot, rDot, pDot, qDot, rDot]
+    #Returning the vector that indicates the change for each part of the state
+    return [pDotx, pDoty, pDotz, xDot, yDot, zDot, pDot, qDot, rDot, pDot, qDot, rDot]
     
     
 def linear_dynamics(t, state, A, B, inputs):
-    """Modeling the linear dynamics of the quadrotor
+    """Modeling the linear dynamics of the quadrotor. The linear dynamics tell you how
+       the state of the quadrotor changes with regards to two things
+       1. The current state of the quadrotor
+       2. The input controls into the quadrotor
 
     Args:
         t (list): The time interval
         state (array): A vector of the current state of the quadrotor
-        inputs (array): A vector of the input forces into the quadrotor
+        inputs (array): A vector of the input forces into the quadrotor, size 1X4
+        A (nd-array): A given matrix for state linear dynamics (given in slides)
+        B (nd-array): A given matrix for input linear dynamics (given in slides)
 
     Returns:
-        float: a floating point number indicating the change in x
+        array: An array defining the change in the state for each dimension of the quadrotor
     """
     Px, Py, Pz, u, v, w, phi, theta, psi, p, q, r = state
     
-    #The change in X (xDot) is equal to Ax + Bu (@ is matrix-multiplication operator)
-    #x in this equation is equal to the state and u is equal to the control inputs
+    #The change in state (xDot) is equal to Ax + Bu (@ is matrix-multiplication operator)
+    #x in this equation is equal to the current state and u is equal to the control inputs
     xDot = (A @ state) + B @ inputs
 
     return xDot
@@ -77,9 +103,10 @@ def linear_dynamics(t, state, A, B, inputs):
 
 #The controller for the feedforward method
 def feedforward_controller(targetState, state, K):
-    """The feedforward controller. This controller only uses the feedback matrix K
-        to adjust the inputs. The goal is the minimze the error between the current
-        state and the goal state for the quadrotor
+    """The feedforward controller. This controller uses only the feedback matrix K
+        to adjust the inputs of the quadrotor. The goal is the minimize the error 
+        between the current state and the targetState state for the quadrotor. It
+        uses the formula −K(x−xeq) to produce a new control vector
 
     Args:
         targetState (array): A vector representing the target (goal) state of the quadrotor
@@ -88,13 +115,13 @@ def feedforward_controller(targetState, state, K):
                       LQR or other optimization methods (given to us by Dr. Romagnoli)
 
     Returns:
-        array: A new vector to adjust inputs
+        array: A new vector of 4 values to adjust the inputs
     """
 
     #The error is the difference between the goal state and the current state
     error = [state - target for target, state in zip(targetState, state)]
 
-    #Controlling by multiplying error by negative feedback matrix K
+    #Controlling by multiplying error by negative feedback matrix K "−K(x−xeq)"
     control = -K @ (error)
 
     return control
@@ -606,6 +633,6 @@ if __name__ == '__main__':
     inputs['Yaw'] = 1
 
     #Run simulation
-    simulate_quadrotor_linear_integral_controller(inputs, g, Mq, Jx, Jy, Jz)
+    simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
     #simulate_figure_8()
 
