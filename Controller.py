@@ -130,22 +130,24 @@ def feedforward_controller(targetState, state, K):
 
 def integral_controller(targetState, state, integral, K, Kc):
     """An integral controller 'remembers' errors and can adjust the quadrotor even
-       in the presence of small errors.
+       in the presence of small errors. It uses the K and Kc matrix to 
+       return a new input vector of forces to control the quadrotor
 
     Args:
         targetState (array): A vector representing the target (goal) state of the quadrotor
         state (array): A vector representing the current state of the quadrotor
         integral (_type_): _description_
         K (nd-array): A multi-dimensional array (matrix) of feedback
-        Kc (_type_): _description_
+        Kc (nd-array): A multi-dimensional array (matrix) of feedback
 
     Returns:
-        _type_: _description_
+        array: A new vector of 4 values to adjust the inputs
     """
-    return -K @ (state - targetState) - Kc @ integral
+    integral_control = -K @ (state - targetState) - Kc @ integral
+
+    return integral_control
 
 
-#This is the goal of the program
 def figure_8_trajectory(t, A, B, omega, z0):
     """The figure eight dynamics given by Dr. Romagnoli in the project writeup. The goal is to get the quadrotor
        to follow a figure eight trajectory.
@@ -153,12 +155,12 @@ def figure_8_trajectory(t, A, B, omega, z0):
     Args:
         t (float): The time steps of the simulation
         A (float): The amplitude along the x-axis
-        B (_type_): The amplitude along the y-axis
+        B (float): The amplitude along the y-axis
         omega (float):  The angular velocity
         z0 (float): The constant altitude
 
     Returns:
-        array: A vector of the trajectory
+        array: A vector of the trajectory (3 coordinates)
     """
 
     x_t = A * np.sin(omega * t)
@@ -194,7 +196,20 @@ def simulate_nonlinear(u_func, t_span, initial_state, state, inputs, g, m, Jx, J
 
 
 def simulate_linear(inputs, t_span, initial_state, A, B):
-    """Simulates the linear dynamics of the quadrotor."""
+    """This function simulates the linear dynamics of the quadrotor by solving the 
+       the differential equations. We use SciPy solve_ivp to solve the equations.
+
+    Args:
+        inputs (array): _description_
+        t_span (array): _description_
+        initial_state (array): _description_
+        A (nd-array): _description_
+        B (nd-array): _description_
+
+    Returns:
+        _type_: _description_
+    """
+
     sol = solve_ivp(linear_dynamics, t_span, initial_state, args=(A, B, inputs), dense_output=True)
     return sol
 
@@ -221,24 +236,21 @@ def simulate_quadrotor_linear_controller(inputs, g, m, Jx, Jy, Jz):
     ControllerMatrix = scipy.io.loadmat("ControllerMatrices\K.mat")
     K = ControllerMatrix['K']
 
-    #The integral control matrix Kc
-    ControllerMatrixC = scipy.io.loadmat("ControllerMatrices\Kc.mat")
-    Kc = ControllerMatrixC['Kc']
     
     #The inputs into the quadrotor
     #These are the coordinates we want the quadrotor to go to and hover at (the desired state)
     #The angular velocities and attitude are in radians so put accordingly. 
-    desired_coordinates = [0, 0, 8,     # Position: x, y, z
-                 0, 0, 0,     # Linear velocity: x, y, z
-                 np.pi, 0, 0, # Orientation: roll = 180 deg, pitch = 0, yaw = 0
+    
+    desired_coordinates = [0, 0, 8,     #Position: x, y, z
+                 0, 0, 0,     #Linear velocity: x, y, z
+                 np.pi, 0, 0, #Orientation: roll = 180 deg, pitch = 0, yaw = 0
                  0, 0, 0]
 
+    #Receive optimal inputs into the quadrotor through the controller
     inputs = feedforward_controller(desired_coordinates, initial_state, K)
     
-    #Simulating dynamics
-    #sol_nonlinear = simulate_nonlinear(u_func, time_span, initial_state, desired_coordinates, inputs, g, m, Jx, Jy, Jz)
 
-    #A is a 12x12 matrix for linear simulation
+    #A is a 12x12 matrix for linear simulation (given in slide 35)
     A = np.array([
     [0, 0, 0, 1, 0, 0, 0, 0, 0,  0,  0,  0],
     [0, 0, 0, 0, 1, 0, 0, 0, 0,  0,  0,  0],
@@ -254,7 +266,7 @@ def simulate_quadrotor_linear_controller(inputs, g, m, Jx, Jy, Jz):
     [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0]
     ]) 
 
-    #B is a 12x4 matrix for linear simulation
+    #B is a 12x4 matrix for linear simulation (given in slide 35)
     B = np.array([
     [0, 0, 0, 0], [0, 0, 0, 0],
     [0, 0, 0, 0], [0, 0, 0, 0],
@@ -263,21 +275,17 @@ def simulate_quadrotor_linear_controller(inputs, g, m, Jx, Jy, Jz):
     [0, 0, 0, 1/Jz], [0, 0, 0, 0],
     [0, 0, 0, 0], [0, 0, 0, 0]
     ])
-
+    
+    #Simulating the flight of the quadrotor
     sol_linear = simulate_linear(inputs, time_span, initial_state, A, B)
     
-    plt.figure()
-    #plt.plot(sol_nonlinear.t, sol_nonlinear.y[2], label='Nonlinear z(t)')
-    plt.plot(sol_linear.t, sol_linear.y[2], label='Linear z(t)')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Height (m)')
-    plt.legend()
-    plt.show()
 
+    #Obtaining results from the solved differential equations
     x, y, z = sol_linear.y[0], sol_linear.y[1], sol_linear.y[2]
     roll, pitch, yaw = sol_linear.y[3], sol_linear.y[4], sol_linear.y[5]
     t = sol_linear.t  
 
+    #Creating plots and figures from the simulation
     fig = plt.figure(figsize=(12, 8))
 
     #3D Trajectory Plot
@@ -568,7 +576,7 @@ def simulate_quadrotor_nonlinear_controller(inputs, g, m, Jx, Jy, Jz):
 
 
 
-def simulate_figure_8():
+def simulate_figure_8(A, B, omega, z0):
     """This function simulates the figure-eight trajectory of the quadrotor
     """
     #2 meter amplitude along x-axis
@@ -597,6 +605,7 @@ def simulate_figure_8():
 
 
 if __name__ == '__main__':
+
     #Mass of the quadrotor (kilograms)
     Mq = 0.6
 
