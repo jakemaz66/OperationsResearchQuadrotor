@@ -48,32 +48,33 @@ def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
     TauTheta = inputs['Pitch']
     TauPsi = inputs['Yaw']
 
-    #Calculating the non-linear change dynamics for linear velocities
+    #Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
     uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
     vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
     wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / m)
 
-    #Calculating the non-linear change dynamics for angular velocities
+    #Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
     pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
     qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
     rDot = (((Jx - Jy) / Jz) * q * q) + ((1 / Jz) * TauPsi)
 
-    #Calculating the non-linear change dynamics for angular positions
+    #Calculating the non-linear change dynamics for angular positions (equation 2 slide 31)
     phiDot = (1 * p) + (np.sin(phi) * np.tan(theta) * q) + (np.cos(phi) * np.tan(theta) * r)
     thetaDot = (0 * p) + (np.cos(theta) * q) + (-np.sin(phi) * r)
     psiDot = (0 * p) + (np.sin(phi) / np.cos(theta) * q) + (np.cos(phi) / np.cos(theta) * r)
 
-    #Calculating the non-linear change dynamics for linear positions
+    #Calculating the non-linear change dynamics for linear positions (equation 1 slide 31)
     pDotx = (u * np.cos(theta) * np.cos(psi)) + (v * (np.sin(phi) * np.sin(theta) * np.cos(psi)) - (np.cos(phi) * np.sin(psi))) + \
+    (w * (np.cos(phi) * np.sin(theta) * np.cos(psi)) + (np.sin(phi) * np.sin(psi)))
+
+    pDoty = (u * np.cos(theta) * np.cos(psi)) + (v * (np.sin(phi) * np.sin(theta) * np.cos(psi)) + (np.cos(phi) * np.sin(psi))) + \
     (w * (np.cos(phi) * np.sin(theta) * np.cos(psi)) - (np.sin(phi) * np.sin(psi)))
 
-    pDoty = (u * np.cos(theta) * np.cos(psi)) + (v * (np.sin(phi) * np.sin(theta) * np.cos(psi)) - (np.cos(phi) * np.sin(psi))) + \
-    (w * (np.cos(phi) * np.sin(theta) * np.cos(psi)) - (np.sin(phi) * np.sin(psi)))
-
-    pDotz = (0 * p) + (np.sin(phi) / np.cos(theta) * q) + (np.cos(phi) / np.cos(theta) * r)
+    pDotz = (u * np.sin(theta)) + (v * -np.sin(psi) * np.cos(theta)) + (w * -np.cos(psi) * np.cos(theta))
     
+
     #Returning the vector that indicates the change for each part of the state
-    return [pDotx, pDoty, pDotz, xDot, yDot, zDot, pDot, qDot, rDot, pDot, qDot, rDot]
+    return [pDotx, pDoty, pDotz, uDot, vDot, wDot, phiDot, thetaDot, psiDot, pDot, qDot, rDot]
     
     
 def linear_dynamics(t, state, A, B, inputs):
