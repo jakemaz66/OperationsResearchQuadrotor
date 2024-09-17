@@ -176,6 +176,11 @@ def simulate_nonlinear(t_span, initial_state, state, inputs, g, m, Jx, Jy, Jz):
 
     Returns:
         Scipy : A solved differential equation object
+
+    SciPy's solve_ivp is a package to solve ordinary differntial equations of the form dt/dy = f(t,y)
+    it provides use with the trajectory of the quadrotor over time in regard to it's dynamics, the
+    input forces, and the desired/initial state. We solve for non-linear dynamics here.
+
     """
     #solve_ivp numerically solves differential equations through integration given an initial value
     sol = solve_ivp(nonlinear_dynamics, t_span, initial_state, args=((state, inputs, g, m, Jx, Jy, Jz)), dense_output=True)
@@ -195,6 +200,11 @@ def simulate_linear(inputs, t_span, initial_state, A, B):
 
     Returns:
         Scipy : A solved differential equation object
+
+    SciPy's solve_ivp is a package to solve ordinary differntial equations of the form dt/dy = f(t,y)
+    it provides use with the trajectory of the quadrotor over time in regard to it's dynamics, the
+    input forces, and the desired/initial state. We solve for linear dynamics here.
+
     """
 
     sol = solve_ivp(linear_dynamics, t_span, initial_state, args=(A, B, inputs), dense_output=True)
