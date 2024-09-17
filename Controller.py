@@ -547,7 +547,7 @@ def figure_8_trajectory(t, A, B, omega, z0):
     return np.array([x_t, y_t, z_t])
 
 
-def simulate_figure_8(A, B, omega, z0):
+def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
     """This function simulates the flight of a quadrotor in a figure-eight trajectory
 
     Args:
@@ -557,15 +557,6 @@ def simulate_figure_8(A, B, omega, z0):
         z0 (_type_): constant altitude
     """
 
-    #2 meter amplitude along x-axis
-    A = 2
-    #1-meter amplitude along y-axis
-    B = 1
-    #0.5 rad/seconds angular velocity
-    omega = 0.5
-    #constant altitude of 1 meter
-    z0 = 1
-    
     #5000 timesteps inbetween 0 and 10 seconds
     time_interval_range = np.linspace(0, 20, 5000)
 
@@ -583,6 +574,19 @@ def simulate_figure_8(A, B, omega, z0):
     plt.plot(trajectory[:, 0], time_interval_range, label="Change in x-coordinate over time")
     plt.xlabel('Time')
     plt.ylabel('X meters')
+    plt.suptitle("The X-Coordinates of the quadrotor over time")
+    plt.show()
+
+    plt.plot(trajectory[:, 1], time_interval_range, label="Change in y-coordinate over time")
+    plt.xlabel('Time')
+    plt.ylabel('Y meters')
+    plt.suptitle("The Y-Coordinates of the quadrotor over time")
+    plt.show()
+
+    plt.plot(trajectory[:, 2], time_interval_range, label="Change in z-coordinate over time")
+    plt.xlabel('Time')
+    plt.ylabel('Z meters')
+    plt.suptitle("The Z-Coordinate of the quadrotor over time")
     plt.show()
 
 
@@ -626,6 +630,6 @@ if __name__ == '__main__':
     inputs['Yaw'] = 1
 
     #Run simulation
-    simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
-    #simulate_figure_8()
+    #simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
+    simulate_figure_8()
 
