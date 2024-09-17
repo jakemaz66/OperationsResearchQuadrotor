@@ -128,7 +128,7 @@ def feedforward_controller(targetState, state, K):
     return control
 
 
-def integral_controller(targetState, state, integral, K, Kc):
+def integral_controller(targetState, state, integral, K, Kc, dt):
     """An integral controller 'remembers' errors and can adjust the quadrotor even
        in the presence of small errors. It uses the K and Kc matrix to 
        return a new input vector of forces to control the quadrotor
@@ -136,9 +136,10 @@ def integral_controller(targetState, state, integral, K, Kc):
     Args:
         targetState (array): A vector representing the target (goal) state of the quadrotor
         state (array): A vector representing the current state of the quadrotor
-        integral (_type_): _description_
+        integral (array): _description_
         K (nd-array): A multi-dimensional array (matrix) of feedback
         Kc (nd-array): A multi-dimensional array (matrix) of feedback
+        dt (float): A number to indicate the timestep 
 
     Returns:
         array: A new vector of 4 values to adjust the inputs
@@ -147,12 +148,14 @@ def integral_controller(targetState, state, integral, K, Kc):
     # − [K −Kc] xa
 
     error = [state - target for target, state in zip(targetState, state)]
+    error = np.array(error, dtype=np.float32)
+    dt = np.float32(dt)
+    integral = np.array(integral)
 
-    k = K @ -Kc
-    k = -k
+    integral = integral + np.dot(error, dt)
 
-
-    integral_control = k @ error
+    #Error here because integral is (12x1) and Kc is (4x4)
+    integral_control  = K @ error + Kc @ integral
 
     return integral_control
 
@@ -313,8 +316,7 @@ def simulate_quadrotor_linear_controller(inputs, g, m, Jx, Jy, Jz):
     plt.show()
 
 
-
-def simulate_quadrotor_linear_integral_controller(inputs, g, m, Jx, Jy, Jz):
+def simulate_quadrotor_linear_integral_controller(inputs, g, m, Jx, Jy, Jz, dt):
     """This function simulates the quadrotor moving from a an initial point, taking off to a desired point,
        and hovering around this desired point, but uses the integral controller matrix Kc
 
@@ -325,6 +327,7 @@ def simulate_quadrotor_linear_integral_controller(inputs, g, m, Jx, Jy, Jz):
         Jx (float): The moment of inertia in the x direction
         Jy (float): The moment of inertia in the y direction
         Jz (float): The moment of inertia in the z direction
+        dt (float): The time step for the integral controller
     """
     #Initial state of the quadrtor at rest, has no velocity or positive position coordinates
     initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -348,7 +351,7 @@ def simulate_quadrotor_linear_integral_controller(inputs, g, m, Jx, Jy, Jz):
                  np.pi, 0, 0, # Orientation: roll = 180 deg, pitch = 0, yaw = 0
                  0, 0, 0]
 
-    inputs = integral_controller(desired_coordinates, initial_state, np.zeros_like(initial_state), K, Kc)
+    inputs = integral_controller(desired_coordinates, initial_state, np.zeros_like(initial_state), K, Kc, dt)
 
     #A is a 12x12 matrix for linear simulation
     A = np.array([
@@ -553,8 +556,8 @@ def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
     Args:
         A (float): amplitude along x-axis
         B (_type_): amplitude along y-axis
-        omega (_type_): angular velocity
-        z0 (_type_): constant altitude
+        omega (float): angular velocity
+        z0 (float): constant altitude
     """
 
     #5000 timesteps inbetween 0 and 10 seconds
@@ -588,7 +591,6 @@ def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
     plt.ylabel('Z meters')
     plt.suptitle("The Z-Coordinate of the quadrotor over time")
     plt.show()
-
 
 
 if __name__ == '__main__':
@@ -631,5 +633,6 @@ if __name__ == '__main__':
 
     #Run simulation
     #simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
-    simulate_figure_8()
+    simulate_quadrotor_linear_integral_controller(inputs, g, Mq, Jx, Jy, Jz, 0.1)
+    #simulate_figure_8()
 
