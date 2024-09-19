@@ -120,7 +120,7 @@ def feedforward_controller(targetState, state, K):
     """
 
     #The error is the difference between the goal state and the current state
-    error = [state - target for target, state in zip(targetState, state)]
+    error = [target - state for target, state in zip(targetState, state)]
 
     #Controlling by multiplying error by negative feedback matrix K "−K(x−xeq)"
     control = -K @ (error)
@@ -161,7 +161,11 @@ def integral_controller(targetState, state, integral, K, Kc, dt):
 
 
 def simulate_nonlinear(t_span, initial_state, state, inputs, g, m, Jx, Jy, Jz):
-    """This function simulates the non-linear dynamics of the quadrotor. 
+    """This function simulates the non-linear dynamics of the quadrotor by solving the 
+       the differential equations. We use SciPy solve_ivp to solve the equations which give us predictions
+       of the next state of the quadrotor given the control inputs and current state.
+       The solve_ivp module uses the Range-Kutta method of solving ODEs, which is 
+       a more advanced form of Euler's method.
 
     Args:
         t_span (array): The span of time to simulate
@@ -189,7 +193,10 @@ def simulate_nonlinear(t_span, initial_state, state, inputs, g, m, Jx, Jy, Jz):
 
 def simulate_linear(inputs, t_span, initial_state, A, B):
     """This function simulates the linear dynamics of the quadrotor by solving the 
-       the differential equations. We use SciPy solve_ivp to solve the equations.
+       the differential equations. We use SciPy solve_ivp to solve the equations which give us predictions
+       of the next state of the quadrotor given the control inputs and current state.
+       The solve_ivp module uses the Range-Kutta method of solving ODEs, which is 
+       a more advanced form of Euler's method.
 
     Args:
         inputs (array): A vector of input control forces
@@ -211,43 +218,41 @@ def simulate_linear(inputs, t_span, initial_state, A, B):
     return sol
 
 
-def simulate_quadrotor_linear_controller(inputs, g, m, Jx, Jy, Jz):
-    """This function simulates the quadrotor moving from a an initial point, taking off to a desired point,
-       and hovering around this desired point using only the feedback matrix K
+def simulate_quadrotor_linear_controller(inputs, g, m, Jx, Jy, Jz, initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span = [0, 10]):
+    """This function simulates the quadrotor moving from a an initial state, taking off to a desired state,
+       and hovering around this desired point using only the feedback matrix K of the feedforward controller.
+       This function models the change in the quadrotor's movement using only linear dynamics.
 
     Args:
-        inputs (dict): A dictionary of the input force, roll, pitch, and yaw
+        inputs (dict): A dictionary of the inputs: force, roll, pitch, and yaw
         g (float): The constant for gravity
         m (float): The mass of the quadrotor
         Jx (float): The moment of inertia in the x direction
         Jy (float): The moment of inertia in the y direction
         Jz (float): The moment of inertia in the z direction
+        initial_state (array): The initial state of the quadrotor
+        time_span (array): The time span over which to model the flight of the quadrotor
     """
-    #Initial state of the quadrtor at rest, has no velocity or positive position coordinates
-    initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     
-    #The time span for the quadrotor
-    time_span = [0, 10]
-
     #The control matrix K
     ControllerMatrix = scipy.io.loadmat("ControllerMatrices\K.mat")
     K = ControllerMatrix['K']
-
     
     #The inputs into the quadrotor
     #These are the coordinates we want the quadrotor to go to and hover at (the desired state)
     #The angular velocities and attitude are in radians so put accordingly. 
-    
-    desired_coordinates = [0, 0, 8,     #Position: x, y, z
+    desired_coordinates = [5, 0, 8,     #Linear Position: x, y, z
                  0, 0, 0,     #Linear velocity: x, y, z
-                 np.pi, 0, 0, #Orientation: roll = 180 deg, pitch = 0, yaw = 0
-                 0, 0, 0]
+                 np.pi, 0, 0, #Angular Position: roll = 180 deg, pitch = 0, yaw = 0
+                 0, 0, 0]     #Angular velocity
+    
+    #Zero velocity values indicate we want the quadrotor to hover (stop) at the desired state
 
-    #Receive optimal inputs into the quadrotor through the controller
+    #Receive new inputs into the quadrotor through the controller using the error and feedback matrix K
     inputs = feedforward_controller(desired_coordinates, initial_state, K)
     
 
-    #A is a 12x12 matrix for linear simulation (given in slide 35)
+    #A is a 12x12 matrix used for linear simulation (given in slide 35)
     A = np.array([
     [0, 0, 0, 1, 0, 0, 0, 0, 0,  0,  0,  0],
     [0, 0, 0, 0, 1, 0, 0, 0, 0,  0,  0,  0],
@@ -263,7 +268,7 @@ def simulate_quadrotor_linear_controller(inputs, g, m, Jx, Jy, Jz):
     [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0]
     ]) 
 
-    #B is a 12x4 matrix for linear simulation (given in slide 35)
+    #B is a 12x4 matrix used for linear simulation (given in slide 35)
     B = np.array([
     [0, 0, 0, 0], [0, 0, 0, 0],
     [0, 0, 0, 0], [0, 0, 0, 0],
@@ -275,54 +280,58 @@ def simulate_quadrotor_linear_controller(inputs, g, m, Jx, Jy, Jz):
     
     #Simulating the flight of the quadrotor
     sol_linear = simulate_linear(inputs, time_span, initial_state, A, B)
-    
 
     #Obtaining results from the solved differential equations
-    x, y, z = sol_linear.y[0], sol_linear.y[1], sol_linear.y[2]
-    roll, pitch, yaw = sol_linear.y[3], sol_linear.y[4], sol_linear.y[5]
-    t = sol_linear.t  
+    x, y, z = sol_linear.y[0], sol_linear.y[1], sol_linear.y[2] #x, y, z positions
+    roll, pitch, yaw = sol_linear.y[3], sol_linear.y[4], sol_linear.y[5] #roll, pitch, and yaw
+    t = sol_linear.t  #The time
 
     #Creating plots and figures from the simulation
-    fig = plt.figure(figsize=(12, 8))
+    fig = plt.figure(figsize=(18, 12))
+    plt.suptitle("Simulating the Quadrotor with Linear Dynamics and Feedforward Controller")
 
     #3D Trajectory Plot
     ax1 = fig.add_subplot(221, projection='3d')
-    ax1.plot(x, y, z, label='3D Trajectory')
-    ax1.set_xlabel('X Position (m)')
-    ax1.set_ylabel('Y Position (m)')
-    ax1.set_zlabel('Z Position (m)')
-    ax1.set_title('Quadrotor 3D Trajectory')
-    ax1.legend()
+    ax1.plot(x, y, z, label='3D Trajectory', color='b', linewidth=2, marker='o')
+    ax1.set_title('Quadrotor 3D Trajectory', fontsize=14, fontweight='bold')
+    ax1.legend(loc='upper left', fontsize=10)  
+    ax1.grid(True)
 
     #Position over Time (x, y, z)
     ax2 = fig.add_subplot(222)
-    ax2.plot(t, x, label='x(t)')
-    ax2.plot(t, y, label='y(t)')
-    ax2.plot(t, z, label='z(t)')
-    ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('Position (m)')
-    ax2.set_title('Position vs. Time')
-    ax2.legend()
+    ax2.plot(t, x, label='x(t)', color='r', linestyle='--', marker='s', markersize=4)
+    ax2.plot(t, y, label='y(t)', color='g', linestyle='-.', marker='^', markersize=4)
+    ax2.plot(t, z, label='z(t)', color='b', linestyle='-', marker='o', markersize=4)
+    ax2.set_xlabel('Time (s)', fontsize=12)
+    ax2.set_ylabel('Position (m)', fontsize=12)
+    ax2.set_title('Position vs. Time', fontsize=14, fontweight='bold')
+    ax2.legend(loc='best', fontsize=10)
+    ax2.grid(True)
 
     #Orientation over Time (roll, pitch, yaw)
     ax3 = fig.add_subplot(223)
-    ax3.plot(t, roll, label='Roll (rad)')
-    ax3.plot(t, pitch, label='Pitch (rad)')
-    ax3.plot(t, yaw, label='Yaw (rad)')
-    ax3.set_xlabel('Time (s)')
-    ax3.set_ylabel('Orientation (rad)')
-    ax3.set_title('Orientation vs. Time')
-    ax3.legend()
+    ax3.plot(t, roll, label='Roll (rad)', color='r', linestyle='-', marker='s', markersize=4)
+    ax3.plot(t, pitch, label='Pitch (rad)', color='g', linestyle='--', marker='^', markersize=4)
+    ax3.plot(t, yaw, label='Yaw (rad)', color='b', linestyle='-.', marker='o', markersize=4)
+    ax3.set_xlabel('Time (s)', fontsize=12)
+    ax3.set_ylabel('Orientation (rad)', fontsize=12)
+    ax3.set_title('Orientation vs. Time', fontsize=14, fontweight='bold')
+    ax3.legend(loc='best', fontsize=10)
+    ax3.grid(True)
 
     #Height over Time (for hovering behavior)
     ax4 = fig.add_subplot(224)
-    ax4.plot(t, z, label='Height (z)')
-    ax4.set_xlabel('Time (s)')
-    ax4.set_ylabel('Height (m)')
-    ax4.set_title('Height vs. Time')
-    ax4.legend()
+    ax4.plot(t, z, label='Height (z)', color='m', linestyle='-', marker='o', markersize=4)
+    ax4.set_xlabel('Time (s)', fontsize=12)
+    ax4.set_ylabel('Height (m)', fontsize=12)
+    ax4.set_title('Height vs. Time', fontsize=14, fontweight='bold')
+    ax4.legend(loc='best', fontsize=10)
+    ax4.grid(True)
 
-    plt.tight_layout()
+    #Adjust the layout to avoid overlap
+    plt.tight_layout(pad=3.0)
+
+    #Show the figure
     plt.show()
 
 
@@ -642,7 +651,7 @@ if __name__ == '__main__':
     inputs['Yaw'] = 1
 
     #Run simulation
-    #simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
-    simulate_quadrotor_linear_integral_controller(inputs, g, Mq, Jx, Jy, Jz, 0.1)
+    simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
+    #simulate_quadrotor_linear_integral_controller(inputs, g, Mq, Jx, Jy, Jz, 0.1)
     #simulate_figure_8()
 
