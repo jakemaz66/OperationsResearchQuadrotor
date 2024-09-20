@@ -6,7 +6,7 @@ import scipy.io
 from mpl_toolkits.mplot3d import Axes3D
 
 
-def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
+def nonlinear_dynamics(t, state, targetState, inputs, g, m, Jx, Jy, Jz):
     """Modeling the non-linear dynamics of the quadrotor. The non-linear dynamics tell you how
        the state of the quadrotor changes with regards to three things
        1. The current state of the quadrotor
@@ -40,13 +40,13 @@ def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
     """
 
     #Unpacking the variables of the state
-    Px, Py, Pz, u, v, w, phi, theta, psi, p, q, r = state
+    Px, Py, Pz, u, v, w, phi, theta, psi, p, q, r = targetState
     
     #Obtaining the inputs into the quadrotor
-    F = inputs['Force']
-    TauPhi = inputs['Roll']
-    TauTheta = inputs['Pitch']
-    TauPsi = inputs['Yaw']
+    F = inputs[0]
+    TauPhi = inputs[1]
+    TauTheta = inputs[2]
+    TauPsi = inputs[3]
 
     #Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
     uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
@@ -56,7 +56,7 @@ def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
     #Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
     pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
     qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
-    rDot = (((Jx - Jy) / Jz) * q * q) + ((1 / Jz) * TauPsi)
+    rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
 
     #Calculating the non-linear change dynamics for angular positions (equation 2 slide 31)
     phiDot = (1 * p) + (np.sin(phi) * np.tan(theta) * q) + (np.cos(phi) * np.tan(theta) * r)
@@ -75,6 +75,12 @@ def nonlinear_dynamics(state, inputs, g, m, Jx, Jy, Jz):
 
     #Returning the vector that indicates the change for each part of the state
     return [pDotx, pDoty, pDotz, uDot, vDot, wDot, phiDot, thetaDot, psiDot, pDot, qDot, rDot]
+
+    # array([ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
+    #         0.00000000e+00, -1.28197716e-14, -4.35677178e+04,  2.24683362e+04,
+    #        -7.68676861e-11,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00])
+
+    
     
     
 def linear_dynamics(t, state, A, B, inputs):
@@ -288,7 +294,7 @@ def simulate_quadrotor_linear_controller(inputs, g, m, Jx, Jy, Jz, initial_state
 
     #Creating plots and figures from the simulation
     fig = plt.figure(figsize=(18, 12))
-    plt.suptitle("Simulating the Quadrotor with Linear Dynamics and Feedforward Controller")
+    plt.suptitle(f"Simulating the Quadrotor with Linear Dynamics and Feedforward Controller. Desired State is X:{desired_coordinates[0]}, Y:{desired_coordinates[1]}, Z:{desired_coordinates[2]}, Roll:{desired_coordinates[6]}, Pitch:{desired_coordinates[7]}, Yaw:{desired_coordinates[8]}")
 
     #3D Trajectory Plot
     ax1 = fig.add_subplot(221, projection='3d')
@@ -480,68 +486,66 @@ def simulate_quadrotor_nonlinear_controller(inputs, g, m, Jx, Jy, Jz):
     #The inputs into the quadrotor
     #These are the coordinates we want the quadrotor to go to and hover at (the desired state)
     #The angular velocities and attitude are in radians so put accordingly. 
-    desired_coordinates = [0, 0, 8,     # Position: x, y, z
-                 0, 0, 0,     # Linear velocity: x, y, z
-                 np.pi, 0, 0, # Orientation: roll = 180 deg, pitch = 0, yaw = 0
-                 0, 0, 0]
+    desired_coordinates = [5, 0, 8,     #Linear Position: x, y, z
+                 0, 0, 0,     #Linear velocity: x, y, z
+                 np.pi, 0, 0, #Angular Position: roll = 180 deg, pitch = 0, yaw = 0
+                 0, 0, 0]     #Angular velocity
 
     inputs = feedforward_controller(desired_coordinates, initial_state, K)
     
     #Simulating dynamics
     sol_nonlinear = simulate_nonlinear(time_span, initial_state, desired_coordinates, inputs, g, m, Jx, Jy, Jz)
-    
-    plt.figure()
-    #plt.plot(sol_nonlinear.t, sol_nonlinear.y[2], label='Nonlinear z(t)')
-    plt.plot(sol_nonlinear.t, sol_nonlinear.y[2], label='Linear z(t)')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Height (m)')
-    plt.legend()
-    plt.show()
 
     x, y, z = sol_nonlinear.y[0], sol_nonlinear.y[1], sol_nonlinear.y[2]
     roll, pitch, yaw = sol_nonlinear.y[3], sol_nonlinear.y[4], sol_nonlinear.y[5]
     t = sol_nonlinear.t  
 
-    fig = plt.figure(figsize=(12, 8))
+    #Creating plots and figures from the simulation
+    fig = plt.figure(figsize=(18, 12))
+    plt.suptitle(f"Simulating the Quadrotor with Non-Linear Dynamics and Feedforward Controller. Desired State is X:{desired_coordinates[0]}, Y:{desired_coordinates[1]}, Z:{desired_coordinates[2]}, Roll:{desired_coordinates[6]}, Pitch:{desired_coordinates[7]}, Yaw:{desired_coordinates[8]}")
 
     #3D Trajectory Plot
     ax1 = fig.add_subplot(221, projection='3d')
-    ax1.plot(x, y, z, label='3D Trajectory')
-    ax1.set_xlabel('X Position (m)')
-    ax1.set_ylabel('Y Position (m)')
-    ax1.set_zlabel('Z Position (m)')
-    ax1.set_title('Quadrotor 3D Trajectory')
-    ax1.legend()
+    ax1.plot(x, y, z, label='3D Trajectory', color='b', linewidth=2, marker='o')
+    ax1.set_title('Quadrotor 3D Trajectory', fontsize=14, fontweight='bold')
+    ax1.legend(loc='upper left', fontsize=10)  
+    ax1.grid(True)
 
     #Position over Time (x, y, z)
     ax2 = fig.add_subplot(222)
-    ax2.plot(t, x, label='x(t)')
-    ax2.plot(t, y, label='y(t)')
-    ax2.plot(t, z, label='z(t)')
-    ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('Position (m)')
-    ax2.set_title('Position vs. Time')
-    ax2.legend()
+    ax2.plot(t, x, label='x(t)', color='r', linestyle='--', marker='s', markersize=4)
+    ax2.plot(t, y, label='y(t)', color='g', linestyle='-.', marker='^', markersize=4)
+    ax2.plot(t, z, label='z(t)', color='b', linestyle='-', marker='o', markersize=4)
+    ax2.set_xlabel('Time (s)', fontsize=12)
+    ax2.set_ylabel('Position (m)', fontsize=12)
+    ax2.set_title('Position vs. Time', fontsize=14, fontweight='bold')
+    ax2.legend(loc='best', fontsize=10)
+    ax2.grid(True)
 
     #Orientation over Time (roll, pitch, yaw)
     ax3 = fig.add_subplot(223)
-    ax3.plot(t, roll, label='Roll (rad)')
-    ax3.plot(t, pitch, label='Pitch (rad)')
-    ax3.plot(t, yaw, label='Yaw (rad)')
-    ax3.set_xlabel('Time (s)')
-    ax3.set_ylabel('Orientation (rad)')
-    ax3.set_title('Orientation vs. Time')
-    ax3.legend()
+    ax3.plot(t, roll, label='Roll (rad)', color='r', linestyle='-', marker='s', markersize=4)
+    ax3.plot(t, pitch, label='Pitch (rad)', color='g', linestyle='--', marker='^', markersize=4)
+    ax3.plot(t, yaw, label='Yaw (rad)', color='b', linestyle='-.', marker='o', markersize=4)
+    ax3.set_xlabel('Time (s)', fontsize=12)
+    ax3.set_ylabel('Orientation (rad)', fontsize=12)
+    ax3.set_title('Orientation vs. Time', fontsize=14, fontweight='bold')
+    ax3.legend(loc='best', fontsize=10)
+    ax3.grid(True)
 
     #Height over Time (for hovering behavior)
     ax4 = fig.add_subplot(224)
-    ax4.plot(t, z, label='Height (z)')
-    ax4.set_xlabel('Time (s)')
-    ax4.set_ylabel('Height (m)')
-    ax4.set_title('Height vs. Time')
-    ax4.legend()
+    ax4.plot(t, z, label='Height (z)', color='m', linestyle='-', marker='o', markersize=4)
+    ax4.set_xlabel('Time (s)', fontsize=12)
+    ax4.set_ylabel('Height (m)', fontsize=12)
+    ax4.set_title('Height vs. Time', fontsize=14, fontweight='bold')
+    ax4.legend(loc='best', fontsize=10)
+    ax4.grid(True)
 
-    plt.tight_layout()
+    #Adjust the layout to avoid overlap
+    plt.tight_layout(pad=3.0)
+
+    #Show the figure
     plt.show()
 
 
@@ -574,7 +578,7 @@ def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
 
     Args:
         A (float): amplitude along x-axis
-        B (_type_): amplitude along y-axis
+        B (float): amplitude along y-axis
         omega (float): angular velocity
         z0 (float): constant altitude
     """
@@ -585,30 +589,39 @@ def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
     #Obtaining the coordinates (trajectory) for each timestep in time_interval_range
     trajectory = np.array([figure_8_trajectory(t, A, B, omega, z0) for t in time_interval_range])
     
-    #Plotting the result
-    plt.figure()
-    plt.plot(trajectory[:, 0], trajectory[:, 1], label="Path of Quadrotor in Figure Eight")
-    plt.xlabel('X meters')
-    plt.ylabel('Y meters')
-    plt.suptitle("Quadrotor Figure-8 Path")
-    plt.show()
+    #Creating subplots for the figure-8 graphics
+    fig, axs = plt.subplots(2, 2, figsize=(16, 10))  
+    fig.suptitle(f"Quadrotor Figure-8 Path\nHaving parameters Amplitude X: {A}, Amplitude Y: {B}, and Angular Velocity {omega}", 
+                fontsize=12)
 
-    plt.plot(trajectory[:, 0], time_interval_range, label="Change in x-coordinate over time")
-    plt.xlabel('Time')
-    plt.ylabel('X meters')
-    plt.suptitle("The X-Coordinates of the quadrotor over time")
-    plt.show()
+    #Plotting trajectory in X-Y plane (Figure-8 Path)
+    axs[0, 0].plot(trajectory[:, 0], trajectory[:, 1], label="Path of Quadrotor in Figure Eight")
+    axs[0, 0].set_xlabel('X meters')
+    axs[0, 0].set_ylabel('Y meters')
+    axs[0, 0].set_title("Quadrotor Figure-8 Path")
 
-    plt.plot(trajectory[:, 1], time_interval_range, label="Change in y-coordinate over time")
-    plt.xlabel('Time')
-    plt.ylabel('Y meters')
-    plt.suptitle("The Y-Coordinates of the quadrotor over time")
-    plt.show()
 
-    plt.plot(trajectory[:, 2], time_interval_range, label="Change in z-coordinate over time")
-    plt.xlabel('Time')
-    plt.ylabel('Z meters')
-    plt.suptitle("The Z-Coordinate of the quadrotor over time")
+    #Plotting X-coordinate over time
+    axs[0, 1].plot(time_interval_range, trajectory[:, 0], label="Change in X-coordinate over time")
+    axs[0, 1].set_xlabel('Time')
+    axs[0, 1].set_ylabel('X meters')
+    axs[0, 1].set_title("X-Coordinates of the Quadrotor Over Time")
+
+
+    #Plotting Y-coordinate over time
+    axs[1, 0].plot(time_interval_range, trajectory[:, 1], label="Change in Y-coordinate over time")
+    axs[1, 0].set_xlabel('Time')
+    axs[1, 0].set_ylabel('Y meters')
+    axs[1, 0].set_title("Y-Coordinates of the Quadrotor Over Time")
+
+
+    #Plotting Z-coordinate over time
+    axs[1, 1].plot(time_interval_range, trajectory[:, 2], label="Change in Z-coordinate over time")
+    axs[1, 1].set_xlabel('Time')
+    axs[1, 1].set_ylabel('Z meters')
+    axs[1, 1].set_title("Z-Coordinates of the Quadrotor Over Time")
+  
+    plt.tight_layout(rect=[0, 0, 1, 0.96]) 
     plt.show()
 
 
@@ -651,7 +664,8 @@ if __name__ == '__main__':
     inputs['Yaw'] = 1
 
     #Run simulation
-    simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
+    #simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
+    #simulate_quadrotor_nonlinear_controller(inputs, g, Mq, Jx, Jy, Jz)
     #simulate_quadrotor_linear_integral_controller(inputs, g, Mq, Jx, Jy, Jz, 0.1)
-    #simulate_figure_8()
+    simulate_figure_8(A=9, B=33, omega=.5, z0=12)
 
