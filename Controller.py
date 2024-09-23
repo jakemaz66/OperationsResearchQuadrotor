@@ -100,6 +100,25 @@ def linear_dynamics(t, state, A, B, inputs):
         array: An array defining the change in the state for each dimension of the quadrotor
     """
     Px, Py, Pz, u, v, w, phi, theta, psi, p, q, r = state
+
+    #Calculating the non-linear change dynamics for linear positions (equation 1 slide 31)
+    pDotx = (u * np.cos(theta) * np.cos(psi)) + (v * (np.sin(phi) * np.sin(theta) * np.cos(psi)) - (np.cos(phi) * np.sin(psi))) + \
+    (w * (np.cos(phi) * np.sin(theta) * np.cos(psi)) + (np.sin(phi) * np.sin(psi)))
+
+    pDoty = (u * np.cos(theta) * np.cos(psi)) + (v * (np.sin(phi) * np.sin(theta) * np.cos(psi)) + (np.cos(phi) * np.sin(psi))) + \
+    (w * (np.cos(phi) * np.sin(theta) * np.cos(psi)) - (np.sin(phi) * np.sin(psi)))
+
+    pDotz = (u * np.sin(theta)) + (v * -np.sin(psi) * np.cos(theta)) + (w * -np.cos(psi) * np.cos(theta))
+
+
+    #Calculating the non-linear change dynamics for angular positions (equation 2 slide 31)
+    phiDot = (1 * p) + (np.sin(phi) * np.tan(theta) * q) + (np.cos(phi) * np.tan(theta) * r)
+    thetaDot = (0 * p) + (np.cos(theta) * q) + (-np.sin(phi) * r)
+    psiDot = (0 * p) + (np.sin(phi) / np.cos(theta) * q) + (np.cos(phi) / np.cos(theta) * r)
+
+
+    #Defining the linearized model of for x
+    state = [Px, pDotx, Py, pDoty, Pz, pDotz, phiDot, phi, thetaDot, theta, psiDot, psi]
     
     #The change in state (xDot) is equal to Ax + Bu (@ is matrix-multiplication operator)
     #x in this equation is equal to the current state and u is equal to the control inputs
