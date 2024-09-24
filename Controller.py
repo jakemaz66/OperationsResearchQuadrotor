@@ -5,6 +5,19 @@ import pandas as pd
 import scipy.io
 from mpl_toolkits.mplot3d import Axes3D
 
+# Please look through following suggestions:
+# nonlinear_dynamics line 20 - t and state in function decleration is never used. why is it there? If keep, change to t_span for readability
+# same for t in linear dynamics line 97 
+# General question:
+#   Declare g, m, Jx, Jy, Jz globally. This would avoid need for calling it in every function call. make code cleaner, and variables are all together at top of file.?
+
+# line 257: def simulate_quadrotor_linear_controller(inputs, g, m, Jx, Jy, Jz, initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span = [0, 10]):
+# inputs vs. desired coordinates. Would it not make sense to make desired coordinates a variable in the function to pass it in? like (simulate_quad_linear_contr(desired_coordinates, etc, etc)) YOU do that for same as target state? or is that somethign different?
+# desired state vs desired coordinates..?
+
+
+
+
 
 def nonlinear_dynamics(t, state, targetState, inputs, g, m, Jx, Jy, Jz):
     """Modeling the non-linear dynamics of the quadrotor. The non-linear dynamics tell you how
@@ -266,10 +279,11 @@ def simulate_quadrotor_linear_controller(inputs, g, m, Jx, Jy, Jz, initial_state
     #The inputs into the quadrotor
     #These are the coordinates we want the quadrotor to go to and hover at (the desired state)
     #The angular velocities and attitude are in radians so put accordingly. 
-    desired_coordinates = [5, 0, 8,     #Linear Position: x, y, z
-                 0, 0, 0,     #Linear velocity: x, y, z
-                 np.pi, 0, 0, #Angular Position: roll = 180 deg, pitch = 0, yaw = 0
-                 0, 0, 0]     #Angular velocity
+    desired_coordinates = [
+                0, 0, 8,     #Linear Position: x, y, z
+                0, 0, 0,     #Linear velocity: x, y, z
+                np.pi, 0, 0, #Angular Position: roll = 180 deg, pitch = 0, yaw = 0
+                0, 0, 0]     #Angular velocity
     
     #Zero velocity values indicate we want the quadrotor to hover (stop) at the desired state
 
@@ -390,10 +404,11 @@ def simulate_quadrotor_linear_integral_controller(inputs, g, m, Jx, Jy, Jz, dt):
     #The inputs into the quadrotor
     #These are the coordinates we want the quadrotor to go to and hover at (the desired state)
     #The angular velocities and attitude are in radians so put accordingly. 
-    desired_coordinates = [0, 0, 8,     # Position: x, y, z
-                 0, 0, 0,     # Linear velocity: x, y, z
-                 np.pi, 0, 0, # Orientation: roll = 180 deg, pitch = 0, yaw = 0
-                 0, 0, 0]
+    desired_coordinates = [
+                0, 0, 8,     # Position: x, y, z
+                0, 0, 0,     # Linear velocity: x, y, z
+                np.pi, 0, 0, # Orientation: roll = 180 deg, pitch = 0, yaw = 0
+                0, 0, 0]
 
     inputs = integral_controller(desired_coordinates, initial_state, np.zeros_like(initial_state), K, Kc, dt)
 
@@ -505,10 +520,11 @@ def simulate_quadrotor_nonlinear_controller(inputs, g, m, Jx, Jy, Jz):
     #The inputs into the quadrotor
     #These are the coordinates we want the quadrotor to go to and hover at (the desired state)
     #The angular velocities and attitude are in radians so put accordingly. 
-    desired_coordinates = [5, 0, 8,     #Linear Position: x, y, z
-                 0, 0, 0,     #Linear velocity: x, y, z
-                 np.pi, 0, 0, #Angular Position: roll = 180 deg, pitch = 0, yaw = 0
-                 0, 0, 0]     #Angular velocity
+    desired_coordinates = [
+                5, 0, 8,     #Linear Position: x, y, z
+                0, 0, 0,     #Linear velocity: x, y, z
+                np.pi, 0, 0, #Angular Position: roll = 180 deg, pitch = 0, yaw = 0
+                0, 0, 0]     #Angular velocity
 
     inputs = feedforward_controller(desired_coordinates, initial_state, K)
     
@@ -568,7 +584,7 @@ def simulate_quadrotor_nonlinear_controller(inputs, g, m, Jx, Jy, Jz):
     plt.show()
 
 
-def figure_8_trajectory(t, A, B, omega, z0):
+def figure_8_trajectory(t_steps, A, B, omega, z0):
     """The figure eight dynamics given by Dr. Romagnoli in the project writeup. The goal is to get the quadrotor
        to follow a figure eight trajectory.
 
@@ -583,9 +599,9 @@ def figure_8_trajectory(t, A, B, omega, z0):
         array: A vector of the trajectory (3 coordinates)
     """
 
-    x_t = A * np.sin(omega * t)
+    x_t = A * np.sin(omega * t_steps)
 
-    y_t = B * np.sin(2 * omega * t)
+    y_t = B * np.sin(2 * omega * t_steps)
 
     z_t = z0
 
@@ -606,7 +622,7 @@ def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
     time_interval_range = np.linspace(0, 20, 5000)
 
     #Obtaining the coordinates (trajectory) for each timestep in time_interval_range
-    trajectory = np.array([figure_8_trajectory(t, A, B, omega, z0) for t in time_interval_range])
+    trajectory = np.array([figure_8_trajectory(t_steps = t,A=A, B=B, omega=omega, z0=z0) for t in time_interval_range])
     
     #Creating subplots for the figure-8 graphics
     fig, axs = plt.subplots(2, 2, figsize=(16, 10))  
@@ -676,15 +692,16 @@ if __name__ == '__main__':
     #Moment of inertia for z direction
     Jz = ((2 * Ms * R**2) / 5) + (4 * L**2 * Mm)
 
+    # inputs is just a place holder and will be computed in functions..?
     inputs = {}
-    inputs['Force'] = 5
-    inputs['Roll'] = 1
-    inputs['Pitch'] = 1
-    inputs['Yaw'] = 1
+    inputs['Force'] = 0
+    inputs['Roll'] = 0
+    inputs['Pitch'] = 0
+    inputs['Yaw'] = 0
 
     #Run simulation
-    #simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
+    simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
     #simulate_quadrotor_nonlinear_controller(inputs, g, Mq, Jx, Jy, Jz)
     #simulate_quadrotor_linear_integral_controller(inputs, g, Mq, Jx, Jy, Jz, 0.1)
-    simulate_figure_8(A=9, B=33, omega=.5, z0=12)
+    #simulate_figure_8(A=9, B=33, omega=.5, z0=12)
 
