@@ -37,7 +37,7 @@ ControllerMatrixC = scipy.io.loadmat("ControllerMatrices\Kc.mat")
 Kc = ControllerMatrixC['Kc']
 
 
-def nonlinear_dynamics( curstate, targetState):
+def nonlinear_dynamics( t, curstate, A, B, target_state):
     """Modeling the non-linear dynamics of the quadrotor. The non-linear dynamics tell you how
        the state of the quadrotor changes with regards to three things
        1. The current state of the quadrotor
@@ -56,6 +56,7 @@ def nonlinear_dynamics( curstate, targetState):
         u, v, w -> These are the linear velocities of the quadrotor
         phi, theta, psi -> These are the Attitude values of the quadrotor (tilt/position), they are measured in radians
         p, q, r -> These are the angular velocities of the quadrotor, they are measured in radians
+        u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r = curstate
 
     control_input into the system (quadrotor) are Force (throttle), Roll Torque, Pitch Torque, and Yaw Torque:
         F -> Force
@@ -64,17 +65,12 @@ def nonlinear_dynamics( curstate, targetState):
         TauPsi -> Yaw torque
     This produces an input array of type [F, TauPhim TauTheta, TauPsi]
     """
-
-    #Unpacking the variables of the state
-    # FALSE< CHANGE!!! 
-    #Px, Py, Pz, u, v, w, phi, theta, psi, p, q, r = targetState
-
     u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r = curstate
 
 
         # Initialize an empty list to store the errors
     error = []
-
+    
     # Iterate exactly 12 times (assuming target_state and curstate have at least 12 elements)
     for i in range(12):
         target = target_state[i]
@@ -82,6 +78,9 @@ def nonlinear_dynamics( curstate, targetState):
 
         # Compute the difference between target and state
         difference = state - target
+
+        # when switching them, integral solver never ends
+        #difference =  target - state
         #print(target, " ", state)
 
         # Append the result to the error list
@@ -89,14 +88,13 @@ def nonlinear_dynamics( curstate, targetState):
 
     #Controlling by multiplying error by negative feedback matrix K "−K(x−xeq)"
     control = -K @ (error)
+    #print(f"Time: {t}, State: {curstate}")
 
-    # print(target_state)
-    # AADD 
-    # Obtaining the control_input into the quadrotor
-    F = control[0] + Mq * g
-    TauPhi = control[1]
-    TauTheta = control[2]
-    TauPsi = control[3]
+    F = control[0] + Mq * g # Force -> Throttle
+    TauPhi = control[1]     # Roll torque
+    TauTheta = control[2]   # Pitch torque 
+    TauPsi = control[3]     # Yaw Torque
+    #print(control)
 
     #Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
     uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
@@ -124,11 +122,10 @@ def nonlinear_dynamics( curstate, targetState):
     
 
     #Returning the vector that indicates the change for each part of the state
-    return [pDotx, pDoty, pDotz, uDot, vDot, wDot, phiDot, thetaDot, psiDot, pDot, qDot, rDot]
 
-    # array([ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
-    #         0.00000000e+00, -1.28197716e-14, -4.35677178e+04,  2.24683362e+04,
-    #        -7.68676861e-11,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00])
+    # u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r
+
+    return [uDot, pDotx,vDot, pDoty,wDot, pDotz, phiDot, pDot, thetaDot, qDot, psiDot, rDot]
 
     
     
@@ -198,45 +195,45 @@ def linear_dynamics(t, curstate, A, B, target_state):
     return xDot
 
 
-#The controller for the feedforward method
-def feedforward_controller(targetState, state):
-    """
-        This controller uses only the feedback matrix K to adjust the control_input
-        of the quadrotor. The goal is to minimize the error between the current state
-        and the targetState state for the quadrotor. It uses the formula −K(x−xeq) to
-        produce a new control vector
+# #The controller for the feedforward method
+# def feedforward_controller(targetState, state):
+#     """
+#         This controller uses only the feedback matrix K to adjust the control_input
+#         of the quadrotor. The goal is to minimize the error between the current state
+#         and the targetState state for the quadrotor. It uses the formula −K(x−xeq) to
+#         produce a new control vector
 
-    Args:
-        targetState (array): A vector representing the target (goal) state of the quadrotor
-        state (array): A vector representing the current state of the quadrotor
+#     Args:
+#         targetState (array): A vector representing the target (goal) state of the quadrotor
+#         state (array): A vector representing the current state of the quadrotor
 
-    Returns:
-        array: A new vector of 4 values to adjust the control_input
-    """
+#     Returns:
+#         array: A new vector of 4 values to adjust the control_input
+#     """
 
-    #The error is the difference between the goal state and the current state
-    #error = [target - state for target, state in zip(targetState, state)]
+#     #The error is the difference between the goal state and the current state
+#     #error = [target - state for target, state in zip(targetState, state)]
 
-    # Initialize an empty list to store the errors
-    error = []
+#     # Initialize an empty list to store the errors
+#     error = []
 
-    # Iterate over target and state pairs from targetState and state
-    for target, state in zip(targetState, state):
-        # Compute the difference between target and state
-        difference = target - state
-        print(target)
+#     # Iterate over target and state pairs from targetState and state
+#     for target, state in zip(targetState, state):
+#         # Compute the difference between target and state
+#         difference = target - state
+#         print(target)
         
-        # Append the result to the error list
-        error.append(difference)
+#         # Append the result to the error list
+#         error.append(difference)
 
-    #Controlling by multiplying error by negative feedback matrix K "−K(x−xeq)"
-    control = -K @ (error)
+#     #Controlling by multiplying error by negative feedback matrix K "−K(x−xeq)"
+#     control = -K @ (error)
 
-    # control[0] = 
-    #control[0] = control[0]+Mq*g
-    print(control)
-    print(targetState)
-    return control
+#     # control[0] = 
+#     #control[0] = control[0]+Mq*g
+#     print(control)
+#     print(targetState)
+#     return control
 
 
 def integral_controller(targetState, state, integral, K, Kc, dt):
@@ -271,30 +268,7 @@ def integral_controller(targetState, state, integral, K, Kc, dt):
     return integral_control
 
 
-def simulate_nonlinear(t_span, initial_state, state, control_input):
-    """This function simulates the non-linear dynamics of the quadrotor by solving the 
-       the differential equations. We use SciPy solve_ivp to solve the equations which give us predictions
-       of the next state of the quadrotor given the control control_input and current state.
-       The solve_ivp module uses the Range-Kutta method of solving ODEs, which is 
-       a more advanced form of Euler's method.
 
-    Args:
-        t_span (array): The span of time to simulate
-        initial_state (array): The initial state of the quadrotor
-        state (array): _description_
-        control_input (array): A vector of input control forces
-
-    Returns:
-        Scipy : A solved differential equation object
-
-    SciPy's solve_ivp is a package to solve ordinary differntial equations of the form dt/dy = f(t,y)
-    it provides use with the trajectory of the quadrotor over time in regard to it's dynamics, the
-    input forces, and the desired/initial state. We solve for non-linear dynamics here.
-
-    """
-    #solve_ivp numerically solves differential equations through integration given an initial value
-    sol = solve_ivp(nonlinear_dynamics, t_span, initial_state, args=((state, control_input, g, m, Jx, Jy, Jz)), dense_output=True)
-    return sol
 
 
 
@@ -539,32 +513,67 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state = [0, 0,
     Args:
         control_input (dict): A dictionary of the input force, roll, pitch, and yaw
     """
+    A = np.array([
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  -g, 0,  0],
+        [1, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, g,  0,  0,  0,  0],
+        [0, 0, 1, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 1, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 1, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  1,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  1,  0]
+    ]) 
 
-    # all we do here is computing the error, therefore not need to call! computing error now in inonlinear_dynamics
-    # control_input = feedforward_controller(target_state, initial_state)
+    #B is a 12x4 matrix used for linear simulation (given in slide 35)
+    B = np.array([
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [-1/m, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 1/Jx, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 1/Jy, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 1/Jz],
+        [0, 0, 0, 0]
+    ])
+
+
+    sol_nonlinear = solve_ivp(nonlinear_dynamics, time_span, initial_state, args=(A, B, target_state), dense_output=True)
+
+    # sol_nonlinear = solve_ivp(nonlinear_dynamics, time_span, initial_state, args=(A, B, target_state), method='LSODA', dense_output=True)
+
+
+    # This is the call in the linear function that works
+    # sol_linear = solve_ivp(linear_dynamics, time_span, initial_state, args=(A, B, target_state) , dense_output=True)
+
+
+
     
-    #Simulating dynamics
-    #sol_nonlinear = simulate_nonlinear(time_span, initial_state, target_state, control_input)
+    # Obtain results from the solved differential equations
+    x, y, z = sol_nonlinear.y[1], sol_nonlinear.y[3], sol_nonlinear.y[5]  # x, y, z positions
+    roll, pitch, yaw = sol_nonlinear.y[7], sol_nonlinear.y[9], sol_nonlinear.y[11]  # roll, pitch, yaw
+    t = sol_nonlinear.t  # Time
 
-    sol_nonlinear = solve_ivp(nonlinear_dynamics, time_span, initial_state, args=((target_state,initial_state)), dense_output=True)
-
-
-    x, y, z = sol_nonlinear.y[0], sol_nonlinear.y[1], sol_nonlinear.y[2]
-    roll, pitch, yaw = sol_nonlinear.y[3], sol_nonlinear.y[4], sol_nonlinear.y[5]
-    t = sol_nonlinear.t  
-
-    #Creating plots and figures from the simulation
+    # Create plots and figures
     fig = plt.figure(figsize=(18, 12))
-    plt.suptitle(f"Simulating the Quadrotor with Non-Linear Dynamics and Feedforward Controller. Desired State is X:{target_state[0]}, Y:{target_state[1]}, Z:{target_state[2]}, Roll:{target_state[6]}, Pitch:{target_state[7]}, Yaw:{target_state[8]}")
+    plt.suptitle(f"Simulating the Quadrotor with Linear Dynamics and Feedforward Controller. "
+                f"Desired State is X:{target_state[1]}, Y:{target_state[3]}, Z:{target_state[5]}")
 
-    #3D Trajectory Plot
+    # 3D Trajectory Plot
     ax1 = fig.add_subplot(221, projection='3d')
     ax1.plot(x, y, z, label='3D Trajectory', color='b', linewidth=2, marker='o')
     ax1.set_title('Quadrotor 3D Trajectory', fontsize=14, fontweight='bold')
-    ax1.legend(loc='upper left', fontsize=10)  
+    ax1.legend(loc='upper left', fontsize=10)
     ax1.grid(True)
 
-    #Position over Time (x, y, z)
+    # Position over Time (x, y, z)
     ax2 = fig.add_subplot(222)
     ax2.plot(t, x, label='x(t)', color='r', linestyle='--', marker='s', markersize=4)
     ax2.plot(t, y, label='y(t)', color='g', linestyle='-.', marker='^', markersize=4)
@@ -575,7 +584,7 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state = [0, 0,
     ax2.legend(loc='best', fontsize=10)
     ax2.grid(True)
 
-    #Orientation over Time (roll, pitch, yaw)
+    # Orientation over Time (roll, pitch, yaw)
     ax3 = fig.add_subplot(223)
     ax3.plot(t, roll, label='Roll (rad)', color='r', linestyle='-', marker='s', markersize=4)
     ax3.plot(t, pitch, label='Pitch (rad)', color='g', linestyle='--', marker='^', markersize=4)
@@ -586,7 +595,7 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state = [0, 0,
     ax3.legend(loc='best', fontsize=10)
     ax3.grid(True)
 
-    #Height over Time (for hovering behavior)
+    # Height over Time (for hovering behavior)
     ax4 = fig.add_subplot(224)
     ax4.plot(t, z, label='Height (z)', color='m', linestyle='-', marker='o', markersize=4)
     ax4.set_xlabel('Time (s)', fontsize=12)
@@ -595,11 +604,64 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state = [0, 0,
     ax4.legend(loc='best', fontsize=10)
     ax4.grid(True)
 
-    #Adjust the layout to avoid overlap
+    # Adjust layout to avoid overlap
     plt.tight_layout(pad=3.0)
 
-    #Show the figure
+    # Show the figure
     plt.show()
+
+
+    # x, y, z = sol_nonlinear.y[0], sol_nonlinear.y[1], sol_nonlinear.y[2]
+    # roll, pitch, yaw = sol_nonlinear.y[3], sol_nonlinear.y[4], sol_nonlinear.y[5]
+    # t = sol_nonlinear.t  
+
+    # #Creating plots and figures from the simulation
+    # fig = plt.figure(figsize=(18, 12))
+    # plt.suptitle(f"Simulating the Quadrotor with Non-Linear Dynamics and Feedforward Controller. Desired State is X:{target_state[0]}, Y:{target_state[1]}, Z:{target_state[2]}, Roll:{target_state[6]}, Pitch:{target_state[7]}, Yaw:{target_state[8]}")
+
+    # #3D Trajectory Plot
+    # ax1 = fig.add_subplot(221, projection='3d')
+    # ax1.plot(x, y, z, label='3D Trajectory', color='b', linewidth=2, marker='o')
+    # ax1.set_title('Quadrotor 3D Trajectory', fontsize=14, fontweight='bold')
+    # ax1.legend(loc='upper left', fontsize=10)  
+    # ax1.grid(True)
+
+    # #Position over Time (x, y, z)
+    # ax2 = fig.add_subplot(222)
+    # ax2.plot(t, x, label='x(t)', color='r', linestyle='--', marker='s', markersize=4)
+    # ax2.plot(t, y, label='y(t)', color='g', linestyle='-.', marker='^', markersize=4)
+    # ax2.plot(t, z, label='z(t)', color='b', linestyle='-', marker='o', markersize=4)
+    # ax2.set_xlabel('Time (s)', fontsize=12)
+    # ax2.set_ylabel('Position (m)', fontsize=12)
+    # ax2.set_title('Position vs. Time', fontsize=14, fontweight='bold')
+    # ax2.legend(loc='best', fontsize=10)
+    # ax2.grid(True)
+
+    # #Orientation over Time (roll, pitch, yaw)
+    # ax3 = fig.add_subplot(223)
+    # ax3.plot(t, roll, label='Roll (rad)', color='r', linestyle='-', marker='s', markersize=4)
+    # ax3.plot(t, pitch, label='Pitch (rad)', color='g', linestyle='--', marker='^', markersize=4)
+    # ax3.plot(t, yaw, label='Yaw (rad)', color='b', linestyle='-.', marker='o', markersize=4)
+    # ax3.set_xlabel('Time (s)', fontsize=12)
+    # ax3.set_ylabel('Orientation (rad)', fontsize=12)
+    # ax3.set_title('Orientation vs. Time', fontsize=14, fontweight='bold')
+    # ax3.legend(loc='best', fontsize=10)
+    # ax3.grid(True)
+
+    # #Height over Time (for hovering behavior)
+    # ax4 = fig.add_subplot(224)
+    # ax4.plot(t, z, label='Height (z)', color='m', linestyle='-', marker='o', markersize=4)
+    # ax4.set_xlabel('Time (s)', fontsize=12)
+    # ax4.set_ylabel('Height (m)', fontsize=12)
+    # ax4.set_title('Height vs. Time', fontsize=14, fontweight='bold')
+    # ax4.legend(loc='best', fontsize=10)
+    # ax4.grid(True)
+
+    # #Adjust the layout to avoid overlap
+    # plt.tight_layout(pad=3.0)
+
+    # #Show the figure
+    # plt.show()
 
 
 def figure_8_trajectory(t_steps, A, B, omega, z0):
@@ -679,44 +741,26 @@ def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
 
 
 if __name__ == '__main__':
+    print("Main started")
 
-    # target state 
-    # 0 = velocity on x
-    # 1 = position on x
-    # 2 = velocity on y 
-    # 3 = velocity on y 
-    # 4 = velocity on z 
-    # 5 = position on z
-
-    # angular velocity thi
-    # angular position thi
-    # angular velocity thetha 
-    # angular position thetha 
-    # angular velocity psi
-    # angular position psi
-    
     target_state= [
         0, 0,   # velocity and position on x
         0, 0,    # velocity and position on y
-        0, 10,    # velocity and position on z
+        0, 0.1,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0]     # angular velocity and position psi ]
     
 
-    # use above
-    # target_state = [
-    #             0, 0, 0,     #Linear Position: x, y, z
-    #             0, 0, 0.5,     #Linear velocity: x, y, z
-    #             0, 0, 0, #Angular Position: roll = 180 deg, pitch = 0, yaw = 0
-    #             0, 0, 0]     #Angular velocity
-    
 
-    # THIS WORKS! PLEASE DO NOT CHANGE THIS "simulate_quadrotor_linear_controller"
+    # THIS WORKS! At least for height, not sure if it the trajectory is wrong, or wrong display?
+    # PLEASE DO NOT break THIS "simulate_quadrotor_linear_controller"
     #Run simulation
     # simulate_quadrotor_linear_controller(target_state)
-    # next put bounds on control, like 0-7 ? 
-    # torques 0.01 < x < - 0.01
+    #
+    # next (from romagnolli: ) put bounds on control, like 0-7 ?  To see how controller reacts
+    # also put bounds on torques 0.01 < x < - 0.01
+    # this would be similar than saturated contraints in crazys simulation
 
 
 
@@ -730,3 +774,29 @@ if __name__ == '__main__':
 
 
 
+
+
+# def simulate_nonlinear(t_span, initial_state, state, control_input):
+#     """This function simulates the non-linear dynamics of the quadrotor by solving the 
+#        the differential equations. We use SciPy solve_ivp to solve the equations which give us predictions
+#        of the next state of the quadrotor given the control control_input and current state.
+#        The solve_ivp module uses the Range-Kutta method of solving ODEs, which is 
+#        a more advanced form of Euler's method.
+
+#     Args:
+#         t_span (array): The span of time to simulate
+#         initial_state (array): The initial state of the quadrotor
+#         state (array): _description_
+#         control_input (array): A vector of input control forces
+
+#     Returns:
+#         Scipy : A solved differential equation object
+
+#     SciPy's solve_ivp is a package to solve ordinary differntial equations of the form dt/dy = f(t,y)
+#     it provides use with the trajectory of the quadrotor over time in regard to it's dynamics, the
+#     input forces, and the desired/initial state. We solve for non-linear dynamics here.
+
+#     """
+#     #solve_ivp numerically solves differential equations through integration given an initial value
+#     sol = solve_ivp(nonlinear_dynamics, t_span, initial_state, args=((state, control_input, g, m, Jx, Jy, Jz)), dense_output=True)
+#     return sol
