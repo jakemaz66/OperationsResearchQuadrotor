@@ -144,33 +144,35 @@ def linear_dynamics(t, curstate, A, B, target_state):
 def integral_controller(targetState, state, integral, K, Kc, dt):
     """An integral controller 'remembers' errors and can adjust the quadrotor even
        in the presence of small errors. It uses the K and Kc matrix to 
-       return a new input vector of forces to control the quadrotor
+       return a new input vector of forces to control the quadrotor. Its
+       an implementation of a PID controller, where P is the proportional 
+       control, I is an integral of the error, and D is the expected future
+       change (the 'anticipatory' control).
 
     Args:
         targetState (array): A vector representing the target (goal) state of the quadrotor
         state (array): A vector representing the current state of the quadrotor
-        integral (array): _description_
-        K (nd-array): A multi-dimensional array (matrix) of feedback
-        Kc (nd-array): A multi-dimensional array (matrix) of feedback
+        integral (array): The integral term of the PID controller
+        K (nd-array): A multi-dimensional array (matrix) of feedback gains for proportional control
+        Kc (nd-array): A multi-dimensional array (matrix) of feedback gains for integral control
         dt (float): A number to indicate the timestep 
 
     Returns:
         array: A new vector of 4 values to adjust the control_input
     """
 
-    # − [K −Kc] xa
+    #Putting together 4x1 error vector
+    errorX = targetState[0] - state[0]
+    errorY = targetState[1] - state[1]
+    errorZ = targetState[2] - state[2]
+    errorPsi = targetState[8] - state[8]
 
-    error = [state - target for target, state in zip(targetState, state)]
-
-    error = np.array(error, dtype=np.float32)
-    dt = np.float32(dt)
-    integral = np.array(integral)
-
-    integral = integral + np.dot(error, dt)
-
-    integral_control  = K @ error + Kc @ integral
-
-    return integral_control
+    error = np.array([errorX, errorY, errorZ, errorPsi]).reshape(4, 1)
+    
+    #Obtaining integral output
+    control_output = (-K @ state) + (Kc @ error).reshape(1, 4)[0]
+    
+    return control_output
 
 
 
