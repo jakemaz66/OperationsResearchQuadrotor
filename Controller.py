@@ -76,11 +76,6 @@ def nonlinear_dynamics(t, state, targetState, inputs, g, m, Jx, Jy, Jz):
     #Returning the vector that indicates the change for each part of the state
     return [pDotx, pDoty, pDotz, uDot, vDot, wDot, phiDot, thetaDot, psiDot, pDot, qDot, rDot]
 
-    # array([ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
-    #         0.00000000e+00, -1.28197716e-14, -4.35677178e+04,  2.24683362e+04,
-    #        -7.68676861e-11,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00])
-
-    
     
     
 def linear_dynamics(t, state, A, B, inputs):
@@ -101,7 +96,7 @@ def linear_dynamics(t, state, A, B, inputs):
     """
     Px, Py, Pz, u, v, w, phi, theta, psi, p, q, r = state
 
-    #Calculating the non-linear change dynamics for linear positions (equation 1 slide 31)
+    #Calculating the linear change dynamics for linear positions (equation 1 slide 31)
     pDotx = (u * np.cos(theta) * np.cos(psi)) + (v * (np.sin(phi) * np.sin(theta) * np.cos(psi)) - (np.cos(phi) * np.sin(psi))) + \
     (w * (np.cos(phi) * np.sin(theta) * np.cos(psi)) + (np.sin(phi) * np.sin(psi)))
 
@@ -111,7 +106,7 @@ def linear_dynamics(t, state, A, B, inputs):
     pDotz = (u * np.sin(theta)) + (v * -np.sin(psi) * np.cos(theta)) + (w * -np.cos(psi) * np.cos(theta))
 
 
-    #Calculating the non-linear change dynamics for angular positions (equation 2 slide 31)
+    #Calculating the linear change dynamics for angular positions (equation 2 slide 31)
     phiDot = (1 * p) + (np.sin(phi) * np.tan(theta) * q) + (np.cos(phi) * np.tan(theta) * r)
     thetaDot = (0 * p) + (np.cos(theta) * q) + (-np.sin(phi) * r)
     psiDot = (0 * p) + (np.sin(phi) / np.cos(theta) * q) + (np.cos(phi) / np.cos(theta) * r)
@@ -683,8 +678,8 @@ if __name__ == '__main__':
     inputs['Yaw'] = 1
 
     #Run simulation
-    #simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
+    simulate_quadrotor_linear_controller(inputs, g, Mq, Jx, Jy, Jz)
     #simulate_quadrotor_nonlinear_controller(inputs, g, Mq, Jx, Jy, Jz)
     #simulate_quadrotor_linear_integral_controller(inputs, g, Mq, Jx, Jy, Jz, 0.1)
-    simulate_figure_8(A=9, B=33, omega=.5, z0=12)
+    #simulate_figure_8(A=9, B=33, omega=.5, z0=12)
 
