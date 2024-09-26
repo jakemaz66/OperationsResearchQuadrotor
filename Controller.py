@@ -54,8 +54,7 @@ def nonlinear_dynamics( t, curstate, A, B, target_state):
 
     u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r = curstate
 
-
-        # Initialize an empty list to store the errors
+    # Initialize an empty list to store the errors
     error = []
     
     # Iterate exactly 12 times (assuming target_state and curstate have at least 12 elements)
@@ -117,7 +116,6 @@ def linear_dynamics(t, curstate, A, B, target_state):
 
     u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r = curstate
 
-    
     # Initialize an empty list to store the errors
     error = []
 
@@ -133,15 +131,13 @@ def linear_dynamics(t, curstate, A, B, target_state):
         # Append the result to the error list
         error.append(difference)
 
-    #Controlling by multiplying error by negative feedback matrix K "−K(x−xeq)"
+    # Controlling by multiplying error by negative feedback matrix K "−K(x−xeq)"
     control = -K @ (error)
     # print(target_state)
 
-    #The change in state (xDot) is equal to Ax + Bu (@ is matrix-multiplication operator)
-    #x in this equation is equal to the current state and u is equal to the control control_input
+    # The change in state (xDot) is equal to Ax + Bu (@ is matrix-multiplication operator)
+    # x in this equation is equal to the current state and u is equal to the control control_input
     xDot = (A @ curstate) + B @ control
-
-
     return xDot
 
 
@@ -165,13 +161,13 @@ def integral_controller(targetState, state, integral, K, Kc, dt):
     # − [K −Kc] xa
 
     error = [state - target for target, state in zip(targetState, state)]
+
     error = np.array(error, dtype=np.float32)
     dt = np.float32(dt)
     integral = np.array(integral)
 
     integral = integral + np.dot(error, dt)
 
-    
     integral_control  = K @ error + Kc @ integral
 
     return integral_control
@@ -188,11 +184,6 @@ def simulate_quadrotor_linear_controller(target_state, initial_state = [0, 0, 0,
         time_span (array)[start, end]: The time span over which to model the flight of the quadrotor, default 0, 10
         target_state (array): Goal state of the drone. 
     """
-    
-
-
-    #Receive new control_input into the quadrotor through the controller using the error and feedback matrix K
-    #control_input = feedforward_controller(target_state, initial_state)
     
     #A is a 12x12 matrix used for linear simulation (given in slide 35, lecture 3)
     # Change to make it same as on slide.?
@@ -227,19 +218,8 @@ def simulate_quadrotor_linear_controller(target_state, initial_state = [0, 0, 0,
         [0, 0, 0, 0]
     ])
     
-    #Simulating the flight of the quadrotor
-    #sol_linear = simulate_linear(control_input, time_span, initial_state, A, B)
-
-    # solving the  the differential equations
-    # change so that in linear_dynamics function so that state is computed inside of linear dynamics
-    print("Before call")
     
     sol_linear = solve_ivp(linear_dynamics, time_span, initial_state, args=(A, B, target_state) , dense_output=True)
-
-    print("HERE")
-    print()
-    print(sol_linear)
-
 
     # Obtain results from the solved differential equations
     x, y, z = sol_linear.y[1], sol_linear.y[3], sol_linear.y[5]  # x, y, z positions
@@ -294,8 +274,6 @@ def simulate_quadrotor_linear_controller(target_state, initial_state = [0, 0, 0,
 
     # Show the figure
     plt.show()
-
-
 
 
 def simulate_quadrotor_nonlinear_controller(target_state, initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span=[0,10]):
@@ -419,7 +397,7 @@ if __name__ == '__main__':
     # also put bounds on torques 0.01 < x < - 0.01
     # this would be similar than saturated contraints in crazys simulation
 
-
+    # this works too
     simulate_quadrotor_nonlinear_controller(target_state=target_state)
 
 
@@ -503,27 +481,18 @@ def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
     plt.tight_layout(rect=[0, 0, 1, 0.96]) 
     plt.show()
 
-def simulate_quadrotor_linear_integral_controller(control_input, dt, initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span = [0, 10]):
+def simulate_quadrotor_linear_integral_controller(target_state, dt, initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span = [0, 10]):
     """This function simulates the quadrotor moving from a an initial point, taking off to a desired point,
        and hovering around this desired point, but uses the integral controller matrix Kc
 
     Args:
-        control_input (dict): A dictionary of the input force, roll, pitch, and yaw
+        target_state (dict): A dictionary of the input force, roll, pitch, and yaw
         dt (float): The time step for the integral controller
     """
 
 
 
-    #The control_input into the quadrotor
-    #These are the coordinates we want the quadrotor to go to and hover at (the desired state)
-    #The angular velocities and attitude are in radians so put accordingly. 
-    desired_coordinates = [
-                0, 0, 8,     # Position: x, y, z
-                0, 0, 0,     # Linear velocity: x, y, z
-                np.pi, 0, 0, # Orientation: roll = 180 deg, pitch = 0, yaw = 0
-                0, 0, 0]
-
-    control_input = integral_controller(desired_coordinates, initial_state, np.zeros_like(initial_state), K, Kc, dt)
+    control_input = integral_controller(target_state, initial_state, np.zeros_like(initial_state), K, Kc, dt)
 
     #A is a 12x12 matrix used for linear simulation (given in slide 35, lecture 3)
     # Change to make it same as on slide.?
@@ -613,6 +582,10 @@ def simulate_quadrotor_linear_integral_controller(control_input, dt, initial_sta
 
     plt.tight_layout()
     plt.show()
+
+
+
+
 
 
 # def simulate_nonlinear(t_span, initial_state, state, control_input):
