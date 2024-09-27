@@ -54,8 +54,7 @@ def nonlinear_dynamics( t, curstate, A, B, target_state):
 
     u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r = curstate
 
-
-        # Initialize an empty list to store the errors
+    # Initialize an empty list to store the errors
     error = []
     
     # Iterate exactly 12 times (assuming target_state and curstate have at least 12 elements)
@@ -117,7 +116,6 @@ def linear_dynamics(t, curstate, A, B, target_state):
 
     u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r = curstate
 
-    
     # Initialize an empty list to store the errors
     error = []
 
@@ -133,15 +131,13 @@ def linear_dynamics(t, curstate, A, B, target_state):
         # Append the result to the error list
         error.append(difference)
 
-    #Controlling by multiplying error by negative feedback matrix K "−K(x−xeq)"
+    # Controlling by multiplying error by negative feedback matrix K "−K(x−xeq)"
     control = -K @ (error)
     # print(target_state)
 
-    #The change in state (xDot) is equal to Ax + Bu (@ is matrix-multiplication operator)
-    #x in this equation is equal to the current state and u is equal to the control control_input
+    # The change in state (xDot) is equal to Ax + Bu (@ is matrix-multiplication operator)
+    # x in this equation is equal to the current state and u is equal to the control control_input
     xDot = (A @ curstate) + B @ control
-
-
     return xDot
 
 
@@ -303,11 +299,6 @@ def simulate_quadrotor_linear_controller(target_state, initial_state = [0, 0, 0,
         target_state (array): Goal state of the drone. 
     """
     
-
-
-    #Receive new control_input into the quadrotor through the controller using the error and feedback matrix K
-    #control_input = feedforward_controller(target_state, initial_state)
-    
     #A is a 12x12 matrix used for linear simulation (given in slide 35, lecture 3)
     # Change to make it same as on slide.?
     A = np.array([
@@ -341,12 +332,6 @@ def simulate_quadrotor_linear_controller(target_state, initial_state = [0, 0, 0,
         [0, 0, 0, 0]
     ])
     
-    #Simulating the flight of the quadrotor
-    #sol_linear = simulate_linear(control_input, time_span, initial_state, A, B)
-
-    # solving the  the differential equations
-    # change so that in linear_dynamics function so that state is computed inside of linear dynamics
-    print("Before call")
     
     sol_linear = solve_ivp(linear_dynamics_integral, time_span, initial_state, args=(A, B, target_state) , dense_output=True)
 
@@ -408,8 +393,6 @@ def simulate_quadrotor_linear_controller(target_state, initial_state = [0, 0, 0,
 
     # Show the figure
     plt.show()
-
-
 
 
 def simulate_quadrotor_nonlinear_controller(target_state, initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span=[0,10]):
@@ -533,8 +516,8 @@ if __name__ == '__main__':
     # also put bounds on torques 0.01 < x < - 0.01
     # this would be similar than saturated contraints in crazys simulation
 
-
-    #simulate_quadrotor_nonlinear_controller(target_state=target_state)
+    # this works too
+    simulate_quadrotor_nonlinear_controller(target_state=target_state)
 
 
     #simulate_quadrotor_linear_integral_controller(control_input, g, Mq, Jx, Jy, Jz, 0.1)
@@ -616,6 +599,110 @@ def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
   
     plt.tight_layout(rect=[0, 0, 1, 0.96]) 
     plt.show()
+
+def simulate_quadrotor_linear_integral_controller(target_state, dt, initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span = [0, 10]):
+    """This function simulates the quadrotor moving from a an initial point, taking off to a desired point,
+       and hovering around this desired point, but uses the integral controller matrix Kc
+
+    Args:
+        target_state (dict): A dictionary of the input force, roll, pitch, and yaw
+        dt (float): The time step for the integral controller
+    """
+
+
+
+    control_input = integral_controller(target_state, initial_state, np.zeros_like(initial_state), K, Kc, dt)
+
+    #A is a 12x12 matrix used for linear simulation (given in slide 35, lecture 3)
+    # Change to make it same as on slide.?
+    A = np.array([
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  -g, 0,  0],
+        [1, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, g,  0,  0,  0,  0],
+        [0, 0, 1, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 1, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 1, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  1,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0],
+        [0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  1,  0]
+    ]) 
+
+    #B is a 12x4 matrix used for linear simulation (given in slide 35)
+    B = np.array([
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [-1/m, 0, 0, 0],
+        [0, 1/Jx, 0, 0],
+        [0, 0, 1/Jy, 0],
+        [0, 0, 0, 1/Jz],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0]
+    ])
+
+    sol_linear = simulate_linear(control_input, time_span, initial_state, A, B)
+    
+    plt.figure()
+    #plt.plot(sol_nonlinear.t, sol_nonlinear.y[2], label='Nonlinear z(t)')
+    plt.plot(sol_linear.t, sol_linear.y[2], label='Linear z(t)')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Height (m)')
+    plt.legend()
+    plt.show()
+
+    x, y, z = sol_linear.y[0], sol_linear.y[1], sol_linear.y[2]
+    roll, pitch, yaw = sol_linear.y[3], sol_linear.y[4], sol_linear.y[5]
+    t = sol_linear.t  
+
+    fig = plt.figure(figsize=(12, 8))
+
+    #3D Trajectory Plot
+    ax1 = fig.add_subplot(221, projection='3d')
+    ax1.plot(x, y, z, label='3D Trajectory')
+    ax1.set_xlabel('X Position (m)')
+    ax1.set_ylabel('Y Position (m)')
+    ax1.set_zlabel('Z Position (m)')
+    ax1.set_title('Quadrotor 3D Trajectory')
+    ax1.legend()
+
+    #Position over Time (x, y, z)
+    ax2 = fig.add_subplot(222)
+    ax2.plot(t, x, label='x(t)')
+    ax2.plot(t, y, label='y(t)')
+    ax2.plot(t, z, label='z(t)')
+    ax2.set_xlabel('Time (s)')
+    ax2.set_ylabel('Position (m)')
+    ax2.set_title('Position vs. Time')
+    ax2.legend()
+
+    #Orientation over Time (roll, pitch, yaw)
+    ax3 = fig.add_subplot(223)
+    ax3.plot(t, roll, label='Roll (rad)')
+    ax3.plot(t, pitch, label='Pitch (rad)')
+    ax3.plot(t, yaw, label='Yaw (rad)')
+    ax3.set_xlabel('Time (s)')
+    ax3.set_ylabel('Orientation (rad)')
+    ax3.set_title('Orientation vs. Time')
+    ax3.legend()
+
+    #Height over Time (for hovering behavior)
+    ax4 = fig.add_subplot(224)
+    ax4.plot(t, z, label='Height (z)')
+    ax4.set_xlabel('Time (s)')
+    ax4.set_ylabel('Height (m)')
+    ax4.set_title('Height vs. Time')
+    ax4.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
 
 
 
