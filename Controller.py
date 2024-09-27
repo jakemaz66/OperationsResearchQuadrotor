@@ -141,61 +141,54 @@ def linear_dynamics(t, curstate, A, B, target_state):
     return xDot
 
 
-def linear_dynamics_integral(t, curstate, A, B, target_state):
+def linear_dynamics_integral(t, curstate_integral, A, B, target_state):
     """Modeling the linear dynamics of the quadrotor with integral control. The linear dynamics tell you how
        the state of the quadrotor changes with regards to two things
        1. The current state of the quadrotor
        2. The input controls into the quadrotor
 
     Args:
-        t (list): The time interval
-        state (array): A vector of the current state of the quadrotor
-        control_input (array): A vector of the input forces into the quadrotor, size 1X4
+        curstate (array): A vector of the current state of the quadrotor, 1X16
         A (nd-array): A given matrix for state linear dynamics (given in slides)
         B (nd-array): A given matrix for input linear dynamics (given in slides)
+        target_state (array): A vector of the target state of the quadrotor
 
     Returns:
         array: An array defining the change in the state for each dimension of the quadrotor
     """
 
-    u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r = curstate
+    u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r, i1, i2, i3, i4 = curstate_integral
 
     #Putting together 4x1 error vector
-    errorX = target_state[0] - curstate[0]
-    errorY = target_state[1] - curstate[1]
-    errorZ = target_state[2] - curstate[2]
-    errorPsi = target_state[8] - curstate[8]
+    errorX = target_state[1] - curstate_integral[1]
+    errorY = target_state[3] - curstate_integral[3]
+    errorZ = target_state[5] - curstate_integral[5]
+    errorPsi = target_state[11] - curstate_integral[11]
 
     error = np.array([errorX, errorY, errorZ, errorPsi]).reshape(4, 1)
-    
-    #Obtaining integral output
-    control = (-K @ curstate) + (Kc @ error).reshape(1, 4)[0]
-    
-    xDot = (A @ curstate) + (B @ control)
 
-    return xDot
+    x = curstate_integral[0:12] 
+    xc = curstate_integral[12:16]
+
+    # Compute the control
+    control = -K @ x + Kc @ xc
+
+    #Compute Dotx and dxc
+    Dotx = A @ x + B @ control 
+    #Integrator
+    dxc = xc + error.T[0]
+    # Return concatenated result return 
+    np.concatenate((Dotx, dxc))
 
 
-def simulate_quadrotor_linear_integral_controller(control_input, initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span = [0, 10]):
+def simulate_quadrotor_linear_integral_controller(control_input, initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span = [0, 10]):
     """This function simulates the quadrotor moving from a an initial point, taking off to a desired point,
-       and hovering around this desired point, but uses the integral controller matrix Kc
+       and hovering around this desired point, but uses the integral controller matrix Kc.
+       Initial state has 16 components for integral controller specifically.
 
     Args:
         control_input (dict): A dictionary of the input force, roll, pitch, and yaw
     """
-
-
-
-    #The control_input into the quadrotor
-    #These are the coordinates we want the quadrotor to go to and hover at (the desired state)
-    #The angular velocities and attitude are in radians so put accordingly. 
-    desired_coordinates = [
-                0, 0, 8,     # Position: x, y, z
-                0, 0, 0,     # Linear velocity: x, y, z
-                np.pi, 0, 0, # Orientation: roll = 180 deg, pitch = 0, yaw = 0
-                0, 0, 0]
-
-    control_input = integral_controller(desired_coordinates, initial_state, K, Kc)
 
     #A is a 12x12 matrix used for linear simulation (given in slide 35, lecture 3)
     # Change to make it same as on slide.?
@@ -220,70 +213,76 @@ def simulate_quadrotor_linear_integral_controller(control_input, initial_state =
         [0, 0, 0, 0],
         [0, 0, 0, 0],
         [0, 0, 0, 0],
-        [0, 0, 0, 0],
         [-1/m, 0, 0, 0],
+        [0, 0, 0, 0],
         [0, 1/Jx, 0, 0],
+        [0, 0, 0, 0],
         [0, 0, 1/Jy, 0],
+        [0, 0, 0, 0],
         [0, 0, 0, 1/Jz],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
         [0, 0, 0, 0]
     ])
-
-    sol_linear = solve_ivp(linear_dynamics, time_span, control_input, args=(A, B, target_state) , dense_output=True)
     
-    plt.figure()
-    #plt.plot(sol_nonlinear.t, sol_nonlinear.y[2], label='Nonlinear z(t)')
-    plt.plot(sol_linear.t, sol_linear.y[2], label='Linear z(t)')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Height (m)')
-    plt.legend()
-    plt.show()
+    
+    sol_linear = solve_ivp(linear_dynamics_integral, time_span, initial_state, args=(A, B, target_state) , dense_output=True)
 
-    x, y, z = sol_linear.y[0], sol_linear.y[1], sol_linear.y[2]
-    roll, pitch, yaw = sol_linear.y[3], sol_linear.y[4], sol_linear.y[5]
-    t = sol_linear.t  
+    print("HERE")
+    print()
+    print(sol_linear)
 
-    fig = plt.figure(figsize=(12, 8))
 
-    #3D Trajectory Plot
+    # Obtain results from the solved differential equations
+    x, y, z = sol_linear.y[1], sol_linear.y[3], sol_linear.y[5]  # x, y, z positions
+    roll, pitch, yaw = sol_linear.y[7], sol_linear.y[9], sol_linear.y[11]  # roll, pitch, yaw
+    t = sol_linear.t  # Time
+
+    # Create plots and figures
+    fig = plt.figure(figsize=(18, 12))
+    plt.suptitle(f"Simulating the Quadrotor with Linear Dynamics and Integral Controller. "
+                f"Desired State is X:{target_state[1]}, Y:{target_state[3]}, Z:{target_state[5]}")
+
+    # 3D Trajectory Plot
     ax1 = fig.add_subplot(221, projection='3d')
-    ax1.plot(x, y, z, label='3D Trajectory')
-    ax1.set_xlabel('X Position (m)')
-    ax1.set_ylabel('Y Position (m)')
-    ax1.set_zlabel('Z Position (m)')
-    ax1.set_title('Quadrotor 3D Trajectory')
-    ax1.legend()
+    ax1.plot(x, y, z, label='3D Trajectory', color='b', linewidth=2, marker='o')
+    ax1.set_title('Quadrotor 3D Trajectory', fontsize=14, fontweight='bold')
+    ax1.legend(loc='upper left', fontsize=10)
+    ax1.grid(True)
 
-    #Position over Time (x, y, z)
+    # Position over Time (x, y, z)
     ax2 = fig.add_subplot(222)
-    ax2.plot(t, x, label='x(t)')
-    ax2.plot(t, y, label='y(t)')
-    ax2.plot(t, z, label='z(t)')
-    ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('Position (m)')
-    ax2.set_title('Position vs. Time')
-    ax2.legend()
+    ax2.plot(t, x, label='x(t)', color='r', linestyle='--', marker='s', markersize=4)
+    ax2.plot(t, y, label='y(t)', color='g', linestyle='-.', marker='^', markersize=4)
+    ax2.plot(t, z, label='z(t)', color='b', linestyle='-', marker='o', markersize=4)
+    ax2.set_xlabel('Time (s)', fontsize=12)
+    ax2.set_ylabel('Position (m)', fontsize=12)
+    ax2.set_title('Position vs. Time', fontsize=14, fontweight='bold')
+    ax2.legend(loc='best', fontsize=10)
+    ax2.grid(True)
 
-    #Orientation over Time (roll, pitch, yaw)
+    # Orientation over Time (roll, pitch, yaw)
     ax3 = fig.add_subplot(223)
-    ax3.plot(t, roll, label='Roll (rad)')
-    ax3.plot(t, pitch, label='Pitch (rad)')
-    ax3.plot(t, yaw, label='Yaw (rad)')
-    ax3.set_xlabel('Time (s)')
-    ax3.set_ylabel('Orientation (rad)')
-    ax3.set_title('Orientation vs. Time')
-    ax3.legend()
+    ax3.plot(t, roll, label='Roll (rad)', color='r', linestyle='-', marker='s', markersize=4)
+    ax3.plot(t, pitch, label='Pitch (rad)', color='g', linestyle='--', marker='^', markersize=4)
+    ax3.plot(t, yaw, label='Yaw (rad)', color='b', linestyle='-.', marker='o', markersize=4)
+    ax3.set_xlabel('Time (s)', fontsize=12)
+    ax3.set_ylabel('Orientation (rad)', fontsize=12)
+    ax3.set_title('Orientation vs. Time', fontsize=14, fontweight='bold')
+    ax3.legend(loc='best', fontsize=10)
+    ax3.grid(True)
 
-    #Height over Time (for hovering behavior)
+    # Height over Time (for hovering behavior)
     ax4 = fig.add_subplot(224)
-    ax4.plot(t, z, label='Height (z)')
-    ax4.set_xlabel('Time (s)')
-    ax4.set_ylabel('Height (m)')
-    ax4.set_title('Height vs. Time')
-    ax4.legend()
+    ax4.plot(t, z, label='Height (z)', color='m', linestyle='-', marker='o', markersize=4)
+    ax4.set_xlabel('Time (s)', fontsize=12)
+    ax4.set_ylabel('Height (m)', fontsize=12)
+    ax4.set_title('Height vs. Time', fontsize=14, fontweight='bold')
+    ax4.legend(loc='best', fontsize=10)
+    ax4.grid(True)
 
-    plt.tight_layout()
+    # Adjust layout to avoid overlap
+    plt.tight_layout(pad=3.0)
+
+    # Show the figure
     plt.show()
 
 
@@ -510,7 +509,7 @@ if __name__ == '__main__':
     # THIS WORKS! At least for height, not sure if it the trajectory is wrong, or wrong display?
     # PLEASE DO NOT break THIS "simulate_quadrotor_linear_controller"
     #Run simulation
-    simulate_quadrotor_linear_controller(target_state)
+    simulate_quadrotor_linear_integral_controller(target_state)
     #
     # next (from romagnolli: ) put bounds on control, like 0-7 ?  To see how controller reacts
     # also put bounds on torques 0.01 < x < - 0.01
