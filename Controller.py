@@ -170,15 +170,15 @@ def linear_dynamics_integral(t, curstate_integral, A, B, target_state):
     x = curstate_integral[0:12] 
     xc = curstate_integral[12:16]
 
-    # Compute the control
+    #Compute the control
     control = -K @ x + Kc @ xc
 
     #Compute Dotx and dxc
     Dotx = A @ x + B @ control 
     #Integrator
     dxc = xc + error.T[0]
-    # Return concatenated result return 
-    np.concatenate((Dotx, dxc))
+    #Return concatenated result return 
+    return np.concatenate((Dotx, dxc))
 
 
 def simulate_quadrotor_linear_integral_controller(control_input, initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span = [0, 10]):
@@ -224,7 +224,7 @@ def simulate_quadrotor_linear_integral_controller(control_input, initial_state =
     ])
     
     
-    sol_linear = solve_ivp(linear_dynamics_integral, time_span, initial_state, args=(A, B, target_state) , dense_output=True)
+    sol_linear = solve_ivp(linear_dynamics_integral, time_span, initial_state, args=(A, B, target_state_integral) , dense_output=True)
 
     print("HERE")
     print()
@@ -239,7 +239,7 @@ def simulate_quadrotor_linear_integral_controller(control_input, initial_state =
     # Create plots and figures
     fig = plt.figure(figsize=(18, 12))
     plt.suptitle(f"Simulating the Quadrotor with Linear Dynamics and Integral Controller. "
-                f"Desired State is X:{target_state[1]}, Y:{target_state[3]}, Z:{target_state[5]}")
+                f"Desired State is X:{target_state_integral[1]}, Y:{target_state_integral[3]}, Z:{target_state_integral[5]}")
 
     # 3D Trajectory Plot
     ax1 = fig.add_subplot(221, projection='3d')
@@ -332,7 +332,7 @@ def simulate_quadrotor_linear_controller(target_state, initial_state = [0, 0, 0,
     ])
     
     
-    sol_linear = solve_ivp(linear_dynamics_integral, time_span, initial_state, args=(A, B, target_state) , dense_output=True)
+    sol_linear = solve_ivp(linear_dynamics, time_span, initial_state, args=(A, B, target_state) , dense_output=True)
 
     print("HERE")
     print()
@@ -496,27 +496,37 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state = [0, 0,
 if __name__ == '__main__':
     print("Main started")
 
-    target_state= [
+    # target_state= [
+    #     0, 0.5,   # velocity and position on x
+    #     0, 0.5,    # velocity and position on y
+    #     0, 1,    # velocity and position on z
+    #     0, 0,     # angular velocity and position thi
+    #     0, 0,     # angular velocity and position thetha
+    #     0, 0]     # angular velocity and position psi ]
+    
+    target_state_integral= [
         0, 0.5,   # velocity and position on x
         0, 0.5,    # velocity and position on y
         0, 1,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
-        0, 0]     # angular velocity and position psi ]
+        0, 0,
+        0, 0,
+        0, 0]
     
 
 
     # THIS WORKS! At least for height, not sure if it the trajectory is wrong, or wrong display?
     # PLEASE DO NOT break THIS "simulate_quadrotor_linear_controller"
     #Run simulation
-    simulate_quadrotor_linear_integral_controller(target_state)
+    simulate_quadrotor_linear_integral_controller(target_state_integral)
     #
     # next (from romagnolli: ) put bounds on control, like 0-7 ?  To see how controller reacts
     # also put bounds on torques 0.01 < x < - 0.01
     # this would be similar than saturated contraints in crazys simulation
 
     # this works too
-    simulate_quadrotor_nonlinear_controller(target_state=target_state)
+    #simulate_quadrotor_nonlinear_controller(target_state=target_state)
 
 
     #simulate_quadrotor_linear_integral_controller(control_input, g, Mq, Jx, Jy, Jz, 0.1)
