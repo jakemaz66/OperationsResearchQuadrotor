@@ -36,19 +36,16 @@ def nonlinear_dynamics( t, curstate, A, B, target_state):
         # Compute the difference between target and state
         difference = state - target
 
-
         # Append the result to the error list
         error.append(difference)
 
     #Controlling by multiplying error by negative feedback matrix K "−K(x−xeq)"
     control = -K @ (error)
-    #print(f"Time: {t}, State: {curstate}")
 
     F = control[0] + Mq * g # Force -> Throttle
     TauPhi = control[1]     # Roll torque
     TauTheta = control[2]   # Pitch torque 
     TauPsi = control[3]     # Yaw Torque
-    #print(control)
 
     #Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
     uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
@@ -93,7 +90,6 @@ def linear_dynamics(t, curstate, A, B, target_state):
         # Append the result to the error list
         error.append(difference)
 
-
     control = -K @ (error)
 
     xDot = (A @ curstate) + B @ control
@@ -112,7 +108,6 @@ def simulate_quadrotor_linear_integral_controller(target_state, initial_state = 
        Initial state has 16 components for integral controller specifically.
 
     """
-
 
     Ac = np.zeros((4,4))
     Bc = np.eye(4)
@@ -235,10 +230,8 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state = [0, 0,
         target_state: Goal state where drone needs to go to
     """
 
-
     sol_nonlinear = solve_ivp(nonlinear_dynamics, time_span, initial_state, args=(A, B, target_state), dense_output=True)
 
-    # Obtain results from the solved differential equations
     x, y, z = sol_nonlinear.y[1], sol_nonlinear.y[3], sol_nonlinear.y[5]  # x, y, z positions
     roll, pitch, yaw = sol_nonlinear.y[7], sol_nonlinear.y[9], sol_nonlinear.y[11]  # roll, pitch, yaw
     t = sol_nonlinear.t  # Time
@@ -267,7 +260,7 @@ if __name__ == '__main__':
 
     # next (from romagnolli: ) put bounds on control, like 0-7 ?  To see how controller reacts
     # also put bounds on torques 0.01 < x < - 0.01
-    # this would be similar than saturated contraints in crazys simulation
+    # this would be similar to saturated contraints in crazys simulation
 
     #simulate_quadrotor_nonlinear_controller(target_state=target_state)
 
@@ -349,4 +342,3 @@ def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
   
     plt.tight_layout(rect=[0, 0, 1, 0.96]) 
     plt.show()
-
