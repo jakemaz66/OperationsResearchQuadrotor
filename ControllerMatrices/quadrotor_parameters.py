@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.io
+from pathlib import Path
 
 #variables:
 #Mass of the quadrotor (kilograms)
@@ -62,10 +63,9 @@ C = np.array([
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
 ])
 
-
 #The control matrix K
-ControllerMatrix = scipy.io.loadmat("ControllerMatrices\K.mat")
+ControllerMatrix = scipy.io.loadmat(Path("ControllerMatrices") / "K.mat")
 K = ControllerMatrix['K']
 #The integral control matrix Kc
-ControllerMatrixC = scipy.io.loadmat("ControllerMatrices\Kc.mat")
+ControllerMatrixC = scipy.io.loadmat(Path("ControllerMatrices") / "Kc.mat")
 Kc = ControllerMatrixC['Kc']
