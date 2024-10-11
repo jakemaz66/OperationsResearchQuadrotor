@@ -406,21 +406,21 @@ if __name__ == '__main__':
 
     # Run simulation
 
-    # clear_bound_values()
+    clear_bound_values()
     simulate_quadrotor_linear_controller(target_state)
 
-    # clear_bound_values()
-    # simulate_quadrotor_linear_controller(target_state, bounds=(14, 0))
+    clear_bound_values()
+    simulate_quadrotor_linear_controller(target_state, bounds=(14, 0))
 
     # next (from romagnolli: ) put bounds on control, like 0-7 ?  To see how controller reacts
     # also put bounds on torques 0.01 < x < - 0.01
     # this would be similar to saturated contraints in crazys simulation
 
-    # clear_bound_values()
-    # simulate_quadrotor_nonlinear_controller(target_state=target_state)
-    # clear_bound_values()
-    # simulate_quadrotor_nonlinear_controller(
-    #     target_state=target_state, bounds=(14, 0))
+    clear_bound_values()
+    simulate_quadrotor_nonlinear_controller(target_state=target_state)
+    clear_bound_values()
+    simulate_quadrotor_nonlinear_controller(
+        target_state=target_state, bounds=(14, 0))
 
     # simulate_quadrotor_linear_integral_controller(target_state=target_state_integral)
 
