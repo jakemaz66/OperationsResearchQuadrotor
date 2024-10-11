@@ -309,10 +309,10 @@ def plot_force_comparison(time_values):
 
     # Plot tauPhi before and after clipping
     plt.subplot(4, 2, 2)
-    plt.plot(time_values, tauPhi_before_bound,
-             label='TauPhi before clipping', color='r', linestyle='--')
-    plt.plot(time_values, tauPhi_after_bound,
-             label='TauPhi after clipping', color='b')
+    plt.scatter(time_values, tauPhi_before_bound,
+                label='TauPhi before clipping', color='r', s=0.3)
+    plt.scatter(time_values, tauPhi_after_bound,
+                label='TauPhi after clipping', color='b', s=0.3)
     plt.xlabel('Time (s)')
     plt.ylabel('TauPhi (N·m)')
     plt.title('TauPhi Before and After Clipping')
@@ -321,10 +321,10 @@ def plot_force_comparison(time_values):
 
     # Plot tauTheta before and after clipping
     plt.subplot(4, 2, 3)
-    plt.plot(time_values, tauTheta_before_bound,
-             label='TauTheta before clipping', color='r', linestyle='--')
-    plt.plot(time_values, tauTheta_after_bound,
-             label='TauTheta after clipping', color='b')
+    plt.scatter(time_values, tauTheta_before_bound,
+                label='TauTheta before clipping', color='r', s=0.3)
+    plt.scatter(time_values, tauTheta_after_bound,
+                label='TauTheta after clipping', color='b', s=0.3)
     plt.xlabel('Time (s)')
     plt.ylabel('TauTheta (N·m)')
     plt.title('TauTheta Before and After Clipping')
@@ -333,10 +333,10 @@ def plot_force_comparison(time_values):
 
     # Plot tauPsi before and after clipping
     plt.subplot(4, 2, 4)
-    plt.plot(time_values, tauPsi_before_bound,
-             label='TauPsi before clipping', color='r', linestyle='--')
-    plt.plot(time_values, tauPsi_after_bound,
-             label='TauPsi after clipping', color='b')
+    plt.scatter(time_values, tauPsi_before_bound,
+                label='TauPsi before clipping', color='r', s=0.3)
+    plt.scatter(time_values, tauPsi_after_bound,
+                label='TauPsi after clipping', color='b', s=0.3)
     plt.xlabel('Time (s)')
     plt.ylabel('TauPsi (N·m)')
     plt.title('TauPsi Before and After Clipping')
@@ -391,8 +391,8 @@ if __name__ == '__main__':
     print("Main started")
 
     target_state = [
-        0, 0,   # velocity and position on x
-        0, 0,    # velocity and position on y
+        0, 100,   # velocity and position on x
+        0, 100,    # velocity and position on y
         0, 100,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
@@ -406,8 +406,8 @@ if __name__ == '__main__':
 
     # Run simulation
 
-    clear_bound_values()
-    simulate_quadrotor_linear_controller(target_state)
+    # clear_bound_values()
+    # simulate_quadrotor_linear_controller(target_state)
 
     clear_bound_values()
     simulate_quadrotor_linear_controller(target_state, bounds=(14, 0))
@@ -416,11 +416,11 @@ if __name__ == '__main__':
     # also put bounds on torques 0.01 < x < - 0.01
     # this would be similar to saturated contraints in crazys simulation
 
-    clear_bound_values()
-    simulate_quadrotor_nonlinear_controller(target_state=target_state)
-    clear_bound_values()
-    simulate_quadrotor_nonlinear_controller(
-        target_state=target_state, bounds=(14, 0))
+    # clear_bound_values()
+    # simulate_quadrotor_nonlinear_controller(target_state=target_state)
+    # clear_bound_values()
+    # simulate_quadrotor_nonlinear_controller(
+    #     target_state=target_state, bounds=(14, 0))
 
     # simulate_quadrotor_linear_integral_controller(target_state=target_state_integral)
 
