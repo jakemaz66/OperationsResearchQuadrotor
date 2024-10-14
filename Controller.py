@@ -288,6 +288,7 @@ def display_plot(t, x, y, z):
     # Show the plots
     plt.show()
 
+
 def display_plot2(t, x, y, z):
     """
     This function takes time and position data and creates 3D and 2D plots
@@ -299,7 +300,6 @@ def display_plot2(t, x, y, z):
         y (array): Y position data.
         z (array): Z position data.
     """
-
 
     epsilon = 1e-12  # Set a threshold for noise (adjust as necessary)
     x[np.abs(x) < epsilon] = 0
@@ -320,7 +320,8 @@ def display_plot2(t, x, y, z):
 
     # Subplot 2: X position over Time
     ax2 = fig.add_subplot(222)
-    ax2.plot(t, x, label='x(t)', color='r', linestyle='-', marker='s', markersize=4)
+    ax2.plot(t, x, label='x(t)', color='r',
+             linestyle='-', marker='s', markersize=4)
     ax2.set_xlabel('Time (s)', fontsize=12)
     ax2.set_ylabel('X Position (m)', fontsize=12)
     ax2.set_title('X Position vs. Time', fontsize=14, fontweight='bold')
@@ -329,7 +330,8 @@ def display_plot2(t, x, y, z):
 
     # Subplot 3: Y position over Time
     ax3 = fig.add_subplot(223)
-    ax3.plot(t, y, label='y(t)', color='g', linestyle='-', marker='^', markersize=4)
+    ax3.plot(t, y, label='y(t)', color='g',
+             linestyle='-', marker='^', markersize=4)
     ax3.set_xlabel('Time (s)', fontsize=12)
     ax3.set_ylabel('Y Position (m)', fontsize=12)
     ax3.set_title('Y Position vs. Time', fontsize=14, fontweight='bold')
@@ -338,7 +340,8 @@ def display_plot2(t, x, y, z):
 
     # Subplot 4: Z position over Time
     ax4 = fig.add_subplot(224)
-    ax4.plot(t, z, label='z(t)', color='b', linestyle='-', marker='o', markersize=4)
+    ax4.plot(t, z, label='z(t)', color='b',
+             linestyle='-', marker='o', markersize=4)
     ax4.set_xlabel('Time (s)', fontsize=12)
     ax4.set_ylabel('Z Position (m)', fontsize=12)
     ax4.set_title('Z Position vs. Time', fontsize=14, fontweight='bold')
@@ -359,7 +362,7 @@ def plot_force_comparison(time_values):
     plt.figure(figsize=(15, 10))  # Increase figure size for more subplots
 
     # Plot nonlinear dynamics forces (before and after clipping)
-    plt.subplot(4, 2, 1)
+    # plt.subplot(4, 2, 1)
     plt.plot(time_values, force_before_bound,
              label='Force before clipping', color='r', linestyle='--')
     plt.plot(time_values, force_after_bound,
@@ -371,47 +374,47 @@ def plot_force_comparison(time_values):
     plt.grid(True)
 
     # Plot tauPhi before and after clipping
-    plt.subplot(4, 2, 2)
-    plt.scatter(time_values, tauPhi_before_bound,
-                label='TauPhi before clipping', color='r', s=0.3)
-    plt.scatter(time_values, tauPhi_after_bound,
-                label='TauPhi after clipping', color='b', s=0.3)
-    plt.xlabel('Time (s)')
-    plt.ylabel('TauPhi (N·m)')
-    plt.title('TauPhi Before and After Clipping')
-    plt.legend()
-    plt.grid(True)
+    # plt.subplot(4, 2, 2)
+    # plt.scatter(time_values, tauPhi_before_bound,
+    #             label='TauPhi before clipping', color='r', s=0.3)
+    # plt.scatter(time_values, tauPhi_after_bound,
+    #             label='TauPhi after clipping', color='b', s=0.3)
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('TauPhi (N·m)')
+    # plt.title('TauPhi Before and After Clipping')
+    # plt.legend()
+    # plt.grid(True)
 
     # Plot tauTheta before and after clipping
-    plt.subplot(4, 2, 3)
-    plt.scatter(time_values, tauTheta_before_bound,
-                label='TauTheta before clipping', color='r', s=0.3)
-    plt.scatter(time_values, tauTheta_after_bound,
-                label='TauTheta after clipping', color='b', s=0.3)
-    plt.xlabel('Time (s)')
-    plt.ylabel('TauTheta (N·m)')
-    plt.title('TauTheta Before and After Clipping')
-    plt.legend()
-    plt.grid(True)
+    # plt.subplot(4, 2, 3)
+    # plt.scatter(time_values, tauTheta_before_bound,
+    #             label='TauTheta before clipping', color='r', s=0.3)
+    # plt.scatter(time_values, tauTheta_after_bound,
+    #             label='TauTheta after clipping', color='b', s=0.3)
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('TauTheta (N·m)')
+    # plt.title('TauTheta Before and After Clipping')
+    # plt.legend()
+    # plt.grid(True)
 
     # Plot tauPsi before and after clipping
-    plt.subplot(4, 2, 4)
-    plt.scatter(time_values, tauPsi_before_bound,
-                label='TauPsi before clipping', color='r', s=0.3)
-    plt.scatter(time_values, tauPsi_after_bound,
-                label='TauPsi after clipping', color='b', s=0.3)
-    plt.xlabel('Time (s)')
-    plt.ylabel('TauPsi (N·m)')
-    plt.title('TauPsi Before and After Clipping')
-    plt.legend()
-    plt.grid(True)
+    # plt.subplot(4, 2, 4)
+    # plt.scatter(time_values, tauPsi_before_bound,
+    #             label='TauPsi before clipping', color='r', s=0.3)
+    # plt.scatter(time_values, tauPsi_after_bound,
+    #             label='TauPsi after clipping', color='b', s=0.3)
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('TauPsi (N·m)')
+    # plt.title('TauPsi Before and After Clipping')
+    # plt.legend()
+    # plt.grid(True)
 
     # Adjust layout to avoid overlap
     plt.tight_layout()
     plt.show()
 
 
-def simulate_quadrotor_nonlinear_controller(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span=[0, 10], bounds=(0, 0)):
+def simulate_quadrotor_nonlinear_controller(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span=[0, 20], bounds=(0, 0)):
     """
     This function simulates the quadrotor moving from a an initial point, taking off to a desired point,
        and hovering around this desired point, but using non-linear dynamics
@@ -420,7 +423,8 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state=[0, 0, 0
         target_state: Goal state where drone needs to go to
     """
 
-    sol_nonlinear = solve_ivp(nonlinear_dynamics, time_span, initial_state, args=(target_state, bounds), dense_output=True)
+    sol_nonlinear = solve_ivp(nonlinear_dynamics, time_span, initial_state, args=(
+        target_state, bounds), dense_output=True)
 
     # x, y, z positions
     x, y, z = sol_nonlinear.y[1], sol_nonlinear.y[3], sol_nonlinear.y[5]
@@ -447,6 +451,8 @@ def clear_bound_values():
     tauPhi_after_bound.clear()
     tauTheta_after_bound.clear()
     tauPsi_after_bound.clear()
+
+
 def figure_8_trajectory(t_steps, A, B, omega, z0):
     """The figure eight dynamics given by Dr. Romagnoli in the project writeup. The goal is to get the quadrotor
        to follow a figure eight trajectory.
@@ -542,21 +548,24 @@ if __name__ == '__main__':
 
     # Run simulation
 
-    clear_bound_values()
-    #simulate_quadrotor_linear_controller(target_state)
-
-    clear_bound_values()
-    #simulate_quadrotor_linear_controller(target_state, bounds=(0.5, 0))
+    # clear_bound_values()
+    # simulate_quadrotor_linear_controller(target_state)
+    # print(f'Max force before bound: {np.max(force_before_bound)}')
+    # print(f'Max force after bound: {np.max(force_after_bound)}')
 
     # clear_bound_values()
+    # simulate_quadrotor_linear_controller(target_state, bounds=(0.4, 0))
+
+    clear_bound_values()
     simulate_quadrotor_nonlinear_controller(target_state=target_state)
-    # clear_bound_values()
-    # simulate_quadrotor_nonlinear_controller(
-    #     target_state=target_state, bounds=(14, 0))
+    print(f'Max force before bound: {np.max(force_before_bound)}')
+    print(f'Max force after bound: {np.max(force_after_bound)}')
+
+    clear_bound_values()
+    simulate_quadrotor_nonlinear_controller(
+        target_state=target_state, bounds=(6, 0))
 
     # simulate_quadrotor_linear_integral_controller(target_state=target_state_integral)
 
     # Have not tested, or verified this simulate_figure_8 funtion
     # simulate_figure_8(A=9, B=33, omega=.5, z0=12)
-
-
