@@ -18,7 +18,7 @@ tauTheta_after_bound = []
 tauPsi_after_bound = []
 
 
-def nonlinear_dynamics(t, curstate, A, B, target_state, bounds):
+def nonlinear_dynamics(t, curstate, target_state, bounds):
     """
     Modeling the non-linear dynamics of the quadrotor. The non-linear dynamics tell you how
        the state of the quadrotor changes with regards to three things
@@ -181,7 +181,7 @@ def simulate_quadrotor_linear_integral_controller(target_state, initial_state=[0
     roll, pitch, yaw = sol_linear.y[7], sol_linear.y[9], sol_linear.y[11]
     t = sol_linear.t  # Time
 
-    display_plot(t, x, y, z)
+    display_plot2(t, x, y, z)
 
     bound_time_steps = np.linspace(
         time_span[0], time_span[1], len(force_before_bound))
@@ -207,7 +207,7 @@ def simulate_quadrotor_linear_controller(target_state, initial_state=[0, 0, 0, 0
     # x, y, z positions
     x, y, z = sol_linear.y[1], sol_linear.y[3], sol_linear.y[5]
     t = sol_linear.t
-    display_plot(t, x, y, z)
+    display_plot2(t, x, y, z)
 
     bound_time_steps = np.linspace(
         time_span[0], time_span[1], len(force_before_bound))
@@ -288,6 +288,69 @@ def display_plot(t, x, y, z):
     # Show the plots
     plt.show()
 
+def display_plot2(t, x, y, z):
+    """
+    This function takes time and position data and creates 3D and 2D plots
+    to visualize the trajectory and movement of the quadrotor.
+
+    Args:
+        t (array): Time data.
+        x (array): X position data.
+        y (array): Y position data.
+        z (array): Z position data.
+    """
+
+
+    epsilon = 1e-12  # Set a threshold for noise (adjust as necessary)
+    x[np.abs(x) < epsilon] = 0
+    y[np.abs(y) < epsilon] = 0
+
+    # Create a figure for the Position vs. Time plot and the 2D plane plots
+    fig = plt.figure(figsize=(15, 12))
+
+    # Subplot 1: 3D Trajectory Plot (Figure-8)
+    ax1 = fig.add_subplot(221, projection='3d')
+    ax1.plot(x, y, z, label='Trajectory', color='b', linewidth=2)
+    ax1.set_title('Quadrotor 3D Trajectory', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('X Position (m)', fontsize=12)
+    ax1.set_ylabel('Y Position (m)', fontsize=12)
+    ax1.set_zlabel('Z Position (m)', fontsize=12)
+    ax1.legend(loc='best', fontsize=10)
+    ax1.grid(True)
+
+    # Subplot 2: X position over Time
+    ax2 = fig.add_subplot(222)
+    ax2.plot(t, x, label='x(t)', color='r', linestyle='-', marker='s', markersize=4)
+    ax2.set_xlabel('Time (s)', fontsize=12)
+    ax2.set_ylabel('X Position (m)', fontsize=12)
+    ax2.set_title('X Position vs. Time', fontsize=14, fontweight='bold')
+    ax2.legend(loc='best', fontsize=10)
+    ax2.grid(True)
+
+    # Subplot 3: Y position over Time
+    ax3 = fig.add_subplot(223)
+    ax3.plot(t, y, label='y(t)', color='g', linestyle='-', marker='^', markersize=4)
+    ax3.set_xlabel('Time (s)', fontsize=12)
+    ax3.set_ylabel('Y Position (m)', fontsize=12)
+    ax3.set_title('Y Position vs. Time', fontsize=14, fontweight='bold')
+    ax3.legend(loc='best', fontsize=10)
+    ax3.grid(True)
+
+    # Subplot 4: Z position over Time
+    ax4 = fig.add_subplot(224)
+    ax4.plot(t, z, label='z(t)', color='b', linestyle='-', marker='o', markersize=4)
+    ax4.set_xlabel('Time (s)', fontsize=12)
+    ax4.set_ylabel('Z Position (m)', fontsize=12)
+    ax4.set_title('Z Position vs. Time', fontsize=14, fontweight='bold')
+    ax4.legend(loc='best', fontsize=10)
+    ax4.grid(True)
+
+    # Adjust layout to avoid overlap
+    plt.tight_layout()
+
+    # Show the plots
+    plt.show()
+
 
 def plot_force_comparison(time_values):
     """
@@ -357,8 +420,7 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state=[0, 0, 0
         target_state: Goal state where drone needs to go to
     """
 
-    sol_nonlinear = solve_ivp(nonlinear_dynamics, time_span, initial_state, args=(
-        A, B, target_state, bounds), dense_output=True)
+    sol_nonlinear = solve_ivp(nonlinear_dynamics, time_span, initial_state, args=(target_state, bounds), dense_output=True)
 
     # x, y, z positions
     x, y, z = sol_nonlinear.y[1], sol_nonlinear.y[3], sol_nonlinear.y[5]
@@ -366,7 +428,7 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state=[0, 0, 0
     roll, pitch, yaw = sol_nonlinear.y[7], sol_nonlinear.y[9], sol_nonlinear.y[11]
     t = sol_nonlinear.t  # Time
 
-    display_plot(t, x, y, z)
+    display_plot2(t, x, y, z)
 
     bound_time_steps = np.linspace(
         time_span[0], time_span[1], len(force_before_bound))
@@ -385,49 +447,6 @@ def clear_bound_values():
     tauPhi_after_bound.clear()
     tauTheta_after_bound.clear()
     tauPsi_after_bound.clear()
-
-
-if __name__ == '__main__':
-    print("Main started")
-
-    target_state = [
-        0, 100,   # velocity and position on x
-        0, 100,    # velocity and position on y
-        0, 100,    # velocity and position on z
-        0, 0,     # angular velocity and position thi
-        0, 0,     # angular velocity and position thetha
-        0, 0]     # angular velocity and position psi ]
-
-    target_state_integral = [
-        0, 1,   # x, y
-        1, 0]   # z, psy
-
-    # if no bounds are passed default will be unbounded (bounds = 0)
-
-    # Run simulation
-
-    # clear_bound_values()
-    # simulate_quadrotor_linear_controller(target_state)
-
-    clear_bound_values()
-    simulate_quadrotor_linear_controller(target_state, bounds=(14, 0))
-
-    # next (from romagnolli: ) put bounds on control, like 0-7 ?  To see how controller reacts
-    # also put bounds on torques 0.01 < x < - 0.01
-    # this would be similar to saturated contraints in crazys simulation
-
-    # clear_bound_values()
-    # simulate_quadrotor_nonlinear_controller(target_state=target_state)
-    # clear_bound_values()
-    # simulate_quadrotor_nonlinear_controller(
-    #     target_state=target_state, bounds=(14, 0))
-
-    # simulate_quadrotor_linear_integral_controller(target_state=target_state_integral)
-
-    # Have not tested, or verified this simulate_figure_8 funtion
-    # simulate_figure_8(A=9, B=33, omega=.5, z0=12)
-
-
 def figure_8_trajectory(t_steps, A, B, omega, z0):
     """The figure eight dynamics given by Dr. Romagnoli in the project writeup. The goal is to get the quadrotor
        to follow a figure eight trajectory.
@@ -502,3 +521,42 @@ def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
+
+
+if __name__ == '__main__':
+    print("Main started")
+
+    target_state = [
+        0, 1,   # velocity and position on x
+        0, 1,    # velocity and position on y
+        0, 1,    # velocity and position on z
+        0, 0,     # angular velocity and position thi
+        0, 0,     # angular velocity and position thetha
+        0, 0]     # angular velocity and position psi ]
+
+    target_state_integral = [
+        1, 1,   # x, y
+        1, 0]   # z, psy
+
+    # if no bounds are passed default will be unbounded (bounds = 0)
+
+    # Run simulation
+
+    clear_bound_values()
+    #simulate_quadrotor_linear_controller(target_state)
+
+    clear_bound_values()
+    #simulate_quadrotor_linear_controller(target_state, bounds=(0.5, 0))
+
+    # clear_bound_values()
+    simulate_quadrotor_nonlinear_controller(target_state=target_state)
+    # clear_bound_values()
+    # simulate_quadrotor_nonlinear_controller(
+    #     target_state=target_state, bounds=(14, 0))
+
+    # simulate_quadrotor_linear_integral_controller(target_state=target_state_integral)
+
+    # Have not tested, or verified this simulate_figure_8 funtion
+    # simulate_figure_8(A=9, B=33, omega=.5, z0=12)
+
+
