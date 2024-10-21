@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.integrate import solve_ivp
+from scipy.integrate import solve_ivp, odeint
 import matplotlib.pyplot as plt
 
 # All parameters are in seperate file and imported here.
@@ -99,6 +99,41 @@ def linear_dynamics(t, curstate, A, B, target_state):
 def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
     Dotx = Ac @ curstate_integral + Bc @ target_state
     return Dotx
+
+
+def simulate_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]):
+    """This method simulates flight using the Euler method
+
+    Args:
+        target_state (array): The target state of quadrotor
+        initial_state (list, optional): The initial state of quadrotor. Defaults to [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].
+    """
+    time_step = 0.0001
+    total_time = 2
+
+    #Constructing time steps
+    time_range = np.arange(0, total_time + time_step, time_step)
+    total_time_steps = len(time_range)
+
+    x0 = np.zeros(12,)
+
+    #12 is the number of state elements, total_time_steps is the state at each time step
+    x_tot = np.zeros((12, total_time_steps))
+
+    #The first time step is equal to the initial state of the quadrotor
+    x_tot[:, 0] = initial_state
+
+    #At each time-step, update the position array x_tot with the linear_dynamics
+    for j in range (1, total_time_steps):
+        x0 = linear_dynamics(j, x0, A, B, target_state) * time_step + x0
+        x_tot[:, j] = x0
+
+    plt.figure()
+    plt.plot(time_range, x_tot[1, :], label = 'Euler')
+    plt.xlabel("Time")
+    plt.xlabel('X Change')
+    plt.tight_layout()
+    plt.show()
 
 
 def simulate_quadrotor_linear_integral_controller(target_state, initial_state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span = [0, 10]):
@@ -241,11 +276,12 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state = [0, 0,
 
 if __name__ == '__main__':
     print("Main started")
+    
 
     target_state= [
-        0, 0,   # velocity and position on x
-        0, 0,    # velocity and position on y
-        0, 100,    # velocity and position on z
+        0, 1,   # velocity and position on x
+        0, 1,    # velocity and position on y
+        0, 1,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0]     # angular velocity and position psi ]
@@ -256,6 +292,7 @@ if __name__ == '__main__':
         1, 0]   # z, psy
     
     #Run simulation
+    simulate_with_euler(target_state)
     simulate_quadrotor_linear_controller(target_state)
 
     # next (from romagnolli: ) put bounds on control, like 0-7 ?  To see how controller reacts
