@@ -149,6 +149,7 @@ def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
     Dotx = Ac @ curstate_integral + Bc @ target_state
     return Dotx
 
+
 def simulate_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]):
     """This method simulates flight using the Euler method
 
@@ -173,7 +174,7 @@ def simulate_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 
 
     #At each time-step, update the position array x_tot with the linear_dynamics
     for j in range (1, total_time_steps):
-        x0 = linear_dynamics(j, x0, A, B, target_state) * time_step + x0
+        x0 = linear_dynamics(j, x0, A, B, target_state, (0, 0)) * time_step + x0
         x_tot[:, j] = x0
 
     plt.figure()
@@ -509,7 +510,7 @@ def figure_8_trajectory(t_steps, A, B, omega, z0):
     return np.array([x_t, y_t, z_t])
 
 
-def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
+def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
     """This function simulates the flight of a quadrotor in a figure-eight trajectory
 
     Args:
@@ -520,15 +521,33 @@ def simulate_figure_8(A=2, B=1, omega=0.5, z0=1):
     """
 
     # 5000 timesteps inbetween 0 and 10 seconds
-    time_interval_range = np.linspace(0, 20, 5000)
+    time_interval_range = np.linspace(0, 30, 50000)
+    time_step = 20/5000
 
     # Obtaining the coordinates (trajectory) for each timestep in time_interval_range
     trajectory = np.array([figure_8_trajectory(
-        t_steps=t, A=A, B=B, omega=omega, z0=z0) for t in time_interval_range])
+        t_steps=t, A=At, B=Bt, omega=omega, z0=z0) for t in time_interval_range])
+    
+    #Constructing time steps
+    total_time_steps = len(time_interval_range)
+
+    x0 = np.zeros(12,)
+
+    #12 is the number of state elements, total_time_steps is the state at each time step
+    x_tot = np.zeros((12, total_time_steps))
+
+    #The first time step is equal to the initial state of the quadrotor
+    x_tot[:, 0] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    #At each time-step, update the position array x_tot with the linear_dynamics
+    for j in range (1, total_time_steps):
+        target_state = np.array([0, trajectory[j][0], 0, trajectory[j][1], 0, trajectory[j][2], omega, 0, omega, 0, omega, 0])
+        x0 = linear_dynamics(j, x0, A, B, target_state, (0, 0)) * time_step + x0
+        x_tot[:, j] = x0
 
     # Creating subplots for the figure-8 graphics
     fig, axs = plt.subplots(2, 2, figsize=(16, 10))
-    fig.suptitle(f"Quadrotor Figure-8 Path\nHaving parameters Amplitude X: {A}, Amplitude Y: {B}, and Angular Velocity {omega}",
+    fig.suptitle(f"Quadrotor Figure-8 Path\nHaving parameters Amplitude X: {At}, Amplitude Y: {Bt}, and Angular Velocity {omega}",
                  fontsize=12)
 
     # Plotting trajectory in X-Y plane (Figure-8 Path)
@@ -568,8 +587,8 @@ if __name__ == '__main__':
 
     target_state = [
         0, 1,   # velocity and position on x
-        0, 1,    # velocity and position on y
-        0, 1,    # velocity and position on z
+        0, 10,    # velocity and position on y
+        0, 10,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0]     # angular velocity and position psi ]
@@ -590,7 +609,8 @@ if __name__ == '__main__':
     # clear_bound_values()
     # simulate_quadrotor_linear_controller(target_state, bounds=(0.4, 0))
 
-    clear_bound_values()
+    #clear_bound_values()
+    simulate_figure_8()
     simulate_quadrotor_nonlinear_controller(target_state=target_state)
     print(f'Max force before bound: {np.max(force_before_bound)}')
     print(f'Max force after bound: {np.max(force_after_bound)}')
