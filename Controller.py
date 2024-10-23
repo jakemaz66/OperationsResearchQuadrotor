@@ -146,6 +146,7 @@ def linear_dynamics(t, curstate, A, B, target_state, bounds):
 
 
 def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
+    
     target_state = np.array(target_state)
     curstate_integral = np.array(curstate_integral)
     
@@ -154,6 +155,61 @@ def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
 
     Dotx = Ac @ curstate_integral + Bc @ uc
     return Dotx
+
+
+def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, bounds):
+
+    u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = curstate_integral
+    force_bound, torque_bound = bounds
+
+    #Implementing integral control
+    control = -np.block([K, -Kc]) @ np.block([[curstate_integral[:12].T, curstate_integral[12:].T]]).T
+
+    F = control[0] + Mq * g  # Force -> Throttle
+    TauPhi = control[1]     # Roll torque
+    TauTheta = control[2]   # Pitch torque
+    TauPsi = control[3]     # Yaw Torque
+
+    force_before_bound.append(F)
+    tauPhi_before_bound.append(TauPhi)
+    tauTheta_before_bound.append(TauTheta)
+    tauPsi_before_bound.append(TauPsi)
+
+    if force_bound:
+        F = np.clip(F, None, force_bound)
+
+    if torque_bound:
+        TauPhi = np.clip(TauPhi, -torque_bound, torque_bound)
+        TauTheta = np.clip(TauTheta, -torque_bound, torque_bound)
+        TauPsi = np.clip(TauPsi, -torque_bound, torque_bound)
+
+    force_after_bound.append(F)
+    tauPhi_after_bound.append(TauPhi)
+    tauTheta_after_bound.append(TauTheta)
+    tauPsi_after_bound.append(TauPsi)
+
+    # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
+    uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
+    vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
+    wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / m)
+
+    # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
+    pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
+    qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
+    rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
+
+    PxDot = u
+    PyDot = v
+    PzDot = w
+
+    # u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r
+    state_change = [uDot, PxDot, vDot, PyDot, wDot, PzDot, pDot, p, qDot, q, rDot, r, i1, i2, i3, i4]
+    state = []
+    for el in state_change:
+        el = float(el)
+        state.append(el)
+
+    return state
 
 
 def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
@@ -194,6 +250,81 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
     #At each time-step, update the position array x_tot with the linear_dynamics
     for j in range (1, total_time_steps):
         x0 = linear_dynamics_integral(j, x0, Acl, Bcl, target_state) * time_step + x0
+        x_tot[:, j] = x0
+
+    # Create subplots
+    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+    fig.suptitle("Simulating with Euler and Linear Integral Control")
+    
+    # Change in X over time
+    axs[0, 0].plot(time_range, x_tot[1, :], label='X Change')
+    axs[0, 0].set_title('Change in X')
+    axs[0, 0].set_xlabel('Time')
+    axs[0, 0].set_ylabel('X Position')
+
+    # Change in Y over time
+    axs[0, 1].plot(time_range, x_tot[3, :], label='Y Change', color='orange')
+    axs[0, 1].set_title('Change in Y')
+    axs[0, 1].set_xlabel('Time')
+    axs[0, 1].set_ylabel('Y Position')
+
+    # Change in Z over time
+    axs[1, 0].plot(time_range, x_tot[5, :], label='Z Change', color='green')
+    axs[1, 0].set_title('Change in Z')
+    axs[1, 0].set_xlabel('Time')
+    axs[1, 0].set_ylabel('Z Position')
+
+    # 3D Trajectory Plot
+    ax3d = fig.add_subplot(2, 2, 4, projection='3d')
+    ax3d.plot(x_tot[1, :], x_tot[3, :], x_tot[5, :], label='3D Trajectory', color='red')
+    ax3d.set_title('3D Trajectory')
+    ax3d.set_xlabel('X Position')
+    ax3d.set_ylabel('Y Position')
+    ax3d.set_zlabel('Z Position')
+
+    # Adjust layout for better spacing
+    plt.tight_layout()
+    plt.show()
+
+
+def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+                                        total_time=10, time_step=0.0001, bounds=(0,0)):
+    """This method simulates flight using the Euler method
+
+    Args:   
+        target_state (array): The target state of quadrotor
+        initial_state (list, optional): The initial state of quadrotor. Defaults to [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].
+    """
+
+    #Constructing time steps
+    time_range = np.arange(0, total_time + time_step, time_step)
+    total_time_steps = len(time_range)
+
+    x0 = np.zeros(16,)
+
+    #12 is the number of state elements, total_time_steps is the state at each time step
+    x_tot = np.zeros((16, total_time_steps))
+
+    #The first time step is equal to the initial state of the quadrotor
+    x_tot[:, 0] = initial_state
+
+    #Defining the blocks for integral control
+    Ac = np.zeros((4, 4))
+    Bc = np.eye(4)
+
+    Acl = np.block(
+        [
+            # Block 1: A-BK and BKc should have the same row dimensions
+            [A - B @ K, B @ Kc],
+            # Block 2: -BcC and Ac should have the same row dimensions
+            [-Bc @ C, Ac]
+        ]
+    )
+    Bcl = np.vstack([np.zeros((12, 4)), Bc])
+
+    #At each time-step, update the position array x_tot with the linear_dynamics
+    for j in range (1, total_time_steps):
+        x0 = np.array(nonlinear_dynamics_integral(j, x0, Acl, Bcl, target_state, bounds)) * time_step + x0
         x_tot[:, j] = x0
 
     # Create subplots
@@ -652,6 +783,7 @@ if __name__ == '__main__':
     # if no bounds are passed default will be unbounded (bounds = 0)
 
     # Run simulation
+    #simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
     simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
