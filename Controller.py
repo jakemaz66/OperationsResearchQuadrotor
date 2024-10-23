@@ -146,7 +146,7 @@ def linear_dynamics(t, curstate, A, B, target_state, bounds):
 
 
 def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
-    
+
     target_state = np.array(target_state)
     curstate_integral = np.array(curstate_integral)
     
@@ -162,8 +162,13 @@ def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, boun
     u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = curstate_integral
     force_bound, torque_bound = bounds
 
+    target_state = np.array(target_state)
+    curstate_integral = np.array(curstate_integral)
+
+    error = (target_state[[1, 3, 5, 11]] - curstate_integral[[1, 3, 5, 11]])
+
     #Implementing integral control
-    control = -np.block([K, -Kc]) @ np.block([[curstate_integral[:12].T, curstate_integral[12:].T]]).T
+    control = -np.block([K, -Kc]) @ (target_state - curstate_integral)
 
     F = control[0] + Mq * g  # Force -> Throttle
     TauPhi = control[1]     # Roll torque
@@ -204,6 +209,7 @@ def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, boun
 
     # u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r
     state_change = [uDot, PxDot, vDot, PyDot, wDot, PzDot, pDot, p, qDot, q, rDot, r, i1, i2, i3, i4]
+
     state = []
     for el in state_change:
         el = float(el)
@@ -329,7 +335,7 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
 
     # Create subplots
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
-    fig.suptitle("Simulating with Euler and Linear Integral Control")
+    fig.suptitle("Simulating with Euler and Non-linear Integral Control")
     
     # Change in X over time
     axs[0, 0].plot(time_range, x_tot[1, :], label='X Change')
@@ -758,12 +764,71 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
+def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
+
+    #x0 is the inital state of the quadrotor
+    x0 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
+
+    desired_coord = 3 * np.array(desired_coord).reshape(-1, 1)  # Desired point (4x1)
+    vk = 0.01 * desired_coord  # Initial feasible v0
+    ell_star = 1000
+
+    #Time interval for the continuous-time system
+    time_interval = np.arange(0, 10 + time_steps, time_steps)  
+    N = len(time_interval)  # Number of time steps for Euler’s method
+
+    #Initialize matrices for the reference governor
+    #Defining Hx, Hv, and h (the contraint matrices)
+    S = np.block([[-K, Kc], [K, -Kc]])
+    #The constraints
+    s = [6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005].t
+
+    Hx = S @
+
+    # Initialize x array, xx is the evolving state over time (what gets updated at each step of the reference governor)
+    xx = np.zeros((16, N))  # Assuming xx has 16 rows for states and N columns for time steps
+    xx[:, 0] = x0.flatten()  # Set initial state
+
+    #Define the function rg for reference governor computation 
+    def rg(Hx, Hv, h, desired_coord, vk, previous_time_step):
+        """This function is not yet complete
+
+        Args:
+            Hx (_type_): _description_
+            Hv (_type_): _description_
+            h (_type_): _description_
+            desired_coord (_type_): _description_
+            vk (_type_): _description_
+            previous_time_step (_type_): _description_
+        """
+        pass
+
+    # Assuming ts1 is defined elsewhere
+    ts1 = time_steps  # Define ts1 as needed
+
+    #Compute the matrices for the reference governor
+    for i in range(1, N):
+
+        t = (i - 1) * time_steps
+
+        #Update the reference governor if ts1 > ts
+        if (t % ts1) < time_steps:
+
+            k, kappa = rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1])  # rg function call
+            
+            vk = vk + kappa * (desired_coord - vk)  # Update vk
+
+        # Compute control input (K: 4x12 matrix) and state updates
+        u = -K @ xx[:12, i - 1] + Kc @ xx[12:16, i - 1]  # Control input calculation
+        xx[12:16, i] = xx[12:16, i - 1] + (vk - xx[1, i - 1:i]) * time_steps  # Update for states 13 to 16
+        xx[:12, i] = xx[:12, i - 1] + qds_dt(xx[:12, i - 1], u) * time_steps  # Update for states 1 to 12
+
 
 if __name__ == '__main__':
     print("Main started")
 
     target_state = [
-        0, 1,   # velocity and position on x
+        0, 10,   # velocity and position on x
         0, 10,    # velocity and position on y
         0, 10,    # velocity and position on z
         0, 0,     # angular velocity and position thi
@@ -783,11 +848,11 @@ if __name__ == '__main__':
     # if no bounds are passed default will be unbounded (bounds = 0)
 
     # Run simulation
-    #simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
-    simulate_linear_integral_with_euler(target_state=target_state_integral)
+    simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
+    #simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
-    # simulate_quadrotor_linear_controller(target_state)
+    #simulate_quadrotor_nonlinear_controller(target_state)
     # print(f'Max force before bound: {np.max(force_before_bound)}')
     # print(f'Max force after bound: {np.max(force_after_bound)}')
 
