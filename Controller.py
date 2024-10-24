@@ -165,10 +165,11 @@ def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, boun
     target_state = np.array(target_state)
     curstate_integral = np.array(curstate_integral)
 
-    error = (target_state[[1, 3, 5, 11]] - curstate_integral[[1, 3, 5, 11]])
+    error = target_state[:12] - curstate_integral[:12] 
+    integral_error = target_state[12:] - curstate_integral[12:] 
 
     #Implementing integral control
-    control = -np.block([K, -Kc]) @ (target_state - curstate_integral)
+    control = -K @ error - Kc @ integral_error
 
     F = control[0] + Mq * g  # Force -> Throttle
     TauPhi = control[1]     # Roll torque
@@ -180,13 +181,13 @@ def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, boun
     tauTheta_before_bound.append(TauTheta)
     tauPsi_before_bound.append(TauPsi)
 
-    if force_bound:
-        F = np.clip(F, None, force_bound)
+    # if force_bound:
+    #     F = np.clip(F, None, force_bound)
 
-    if torque_bound:
-        TauPhi = np.clip(TauPhi, -torque_bound, torque_bound)
-        TauTheta = np.clip(TauTheta, -torque_bound, torque_bound)
-        TauPsi = np.clip(TauPsi, -torque_bound, torque_bound)
+    # if torque_bound:
+    #     TauPhi = np.clip(TauPhi, -torque_bound, torque_bound)
+    #     TauTheta = np.clip(TauTheta, -torque_bound, torque_bound)
+    #     TauPsi = np.clip(TauPsi, -torque_bound, torque_bound)
 
     force_after_bound.append(F)
     tauPhi_after_bound.append(TauPhi)
@@ -313,20 +314,8 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
 
     #The first time step is equal to the initial state of the quadrotor
     x_tot[:, 0] = initial_state
-
-    #Defining the blocks for integral control
-    Ac = np.zeros((4, 4))
-    Bc = np.eye(4)
-
-    Acl = np.block(
-        [
-            # Block 1: A-BK and BKc should have the same row dimensions
-            [A - B @ K, B @ Kc],
-            # Block 2: -BcC and Ac should have the same row dimensions
-            [-Bc @ C, Ac]
-        ]
-    )
-    Bcl = np.vstack([np.zeros((12, 4)), Bc])
+    Acl = None
+    Bcl = None
 
     #At each time-step, update the position array x_tot with the linear_dynamics
     for j in range (1, total_time_steps):
@@ -783,7 +772,7 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
     #The constraints
     s = [6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005].t
 
-    Hx = S @
+    Hx = S 
 
     # Initialize x array, xx is the evolving state over time (what gets updated at each step of the reference governor)
     xx = np.zeros((16, N))  # Assuming xx has 16 rows for states and N columns for time steps
@@ -815,7 +804,7 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
         if (t % ts1) < time_steps:
 
             k, kappa = rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1])  # rg function call
-            
+
             vk = vk + kappa * (desired_coord - vk)  # Update vk
 
         # Compute control input (K: 4x12 matrix) and state updates
