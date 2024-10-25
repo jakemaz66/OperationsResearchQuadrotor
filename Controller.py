@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
+from scipy.signal import StateSpace, cont2discrete
+import control as ctrl
 
 # All parameters are in seperate file and imported here.
 from ControllerMatrices.quadrotor_parameters import Mq, L, g, Ms, R, Mprop, Mm, Jx, Jy, Jz, m, A, B, C, K, Kc
@@ -758,7 +760,7 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
 def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
 
     #x0 is the inital state of the quadrotor
-    x0 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
+    x0 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
 
     #Transforming the desired (target) point into a 4x1 vector
     desired_coord = np.array(desired_coord).reshape(-1, 1)  
@@ -780,64 +782,6 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
     #S is a constraint matrix that uses the feedback matrices K and Kc
     S = np.block([[-K, Kc], [K, -Kc]])
 
-    #This function constructs the constraint matrix Hx
-    def construct_Hx(S, A, x, ell_star):
-        Hx = []
-        #Loop to construct the stacked Hx matrix
-        for l in range(ell_star + 1):
-
-            # A^l @ x
-            Al_x = np.linalg.matrix_power(A, l).dot(x)  
-            
-            #S @ Al_x
-            Hx.append(S.dot(Al_x))  
-
-        return np.vstack(Hx) 
-    
-    #This function constructs the constraint matrix Hv
-    def construct_Hv(S, A, B, ell_star):
-
-        Hv = []
-        
-        #Identity matrix with same dimensions as A
-        I = np.eye(A.shape[0])  
-
-        #First block is zero
-        Hv.append(np.zeros((S.shape[0], B.shape[1])))  
-        
-        #Loop to construct the other blocks: SB and the inverse term
-        for l in range(1, ell_star + 1):
-
-            Al_B = np.linalg.matrix_power(A, l-1).dot(B)
-
-            Hv.append(S.dot(Al_B))
-        
-        #Adding the final block
-        final_block = np.linalg.inv(I - A).dot(I - np.linalg.matrix_power(A, ell_star)).dot(B)
-        Hv.append(S.dot(final_block))
-        
-        return np.vstack(Hv) 
-    
-    #This function constructs h
-    def construct_h(s, epsilon, ell_star):
-
-        h = [s] * ell_star  
-        #Last element is s - epsilon
-        h.append(s - epsilon) 
-
-        return np.array(h).reshape(-1, 1)
-    
-    Hx = construct_Hx(S, A, x0, ell_star)
-    Hv = construct_Hv(S, A, B, ell_star)
-
-    #The constraints
-    s = [6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005].T
-    h = construct_h(s, 0.005, ell_star)
-
-    # Initialize x array, xx is the evolving state over time (what gets updated at each step of the reference governor)
-    xx = np.zeros((16, N))  # Assuming xx has 16 rows for states and N columns for time steps
-    xx[:, 0] = x0.flatten()  # Set initial state
-
     #Defining the blocks for integral control
     Ac = np.zeros((4, 4))
     Bc = np.eye(4)
@@ -852,20 +796,95 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
     )
     Bcl = np.vstack([np.zeros((12, 4)), Bc])
 
+    Ccl = np.hstack((C, np.zeros((C.shape[0], C.shape[0]))))
+
+    Dcl = Dcl = np.zeros((C.shape[0], B.shape[1]))
+
+    sys = ctrl.ss(Acl, Bcl, Ccl, Dcl)
+    sysd = ctrl.c2d(sys, time_steps)
+
+    Ad = sysd.A
+    Bd = sysd.B
+
+    #This function constructs the constraint matrix Hx
+    def construct_Hx(S, A, x, ell_star):
+        Hx = []
+        #Loop to construct the stacked Hx matrix
+        for l in range(ell_star + 1):
+            
+            #S @ A
+            Hx.append(S.dot(A))  
+
+        return np.vstack(Hx) 
+    
+
+    #This function constructs the constraint matrix Hv
+    def construct_Hv(S, A, B, ell_star):
+
+        Hv = []
+        
+        #Identity matrix with same dimensions as A
+        I = np.eye(A.shape[0])  
+
+        #First block is zero
+        Hv.append(np.zeros((S.shape[0], B.shape[1])))  
+        
+        #Loop to construct the other blocks: SB and the inverse term
+        for l in range(1, ell_star + 1):
+
+            Hv.append(S.dot(B))
+        
+        #Adding the final block
+        final_block = np.linalg.inv(I - A).dot(I - np.linalg.matrix_power(A, ell_star)).dot(B)
+        Hv.append(S.dot(final_block))
+        
+        return np.vstack(Hv) 
+    
+
+    #This function constructs h
+    def construct_h(s, epsilon, ell_star):
+
+        h = [s] * ell_star  
+
+        #Last element is s - epsilon
+        h.append(s - epsilon) 
+
+        return np.array(h).reshape(-1, 1)
+    
+    Hx = construct_Hx(S, Ad, x0, ell_star)
+    Hv = construct_Hv(S, Ad, Bd, ell_star)
+
+    #The constraints
+    s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005]).T
+    h = construct_h(s, 0.005, ell_star)
+
+    # Initialize x array, xx is the evolving state over time (what gets updated at each step of the reference governor)
+    xx = np.zeros((16, N))  # Assuming xx has 16 rows for states and N columns for time steps
+    xx[:, 0] = x0.flatten()  # Set initial state
+
+    def qds_dt(x, u):
+        return A @ x + B @ u
+
     #Define the function rg for reference governor computation 
-    def rg(Hx, Hv, h, desired_coord, vk, state):
+    def rg(Hx, Hv, h, desired_coord, vk, state, j):
         """This function is not yet complete
 
         Args:
-            Hx (_type_): _description_
+            Hx (matrix): The constraint matrix
             Hv (_type_): _description_
             h (_type_): _description_
             desired_coord (_type_): _description_
             vk (_type_): _description_
             previous_time_step (_type_): _description_
         """
-        kappa = (h - (Hx.T @ state) - (Hv.T @ vk)) / (Hv.T * (desired_coord - vk))
-        return vk, kappa
+        Bj = (h[j] - (Hx[j] @ state) - (Hv[j].T @ vk)) 
+
+        #If Aj > 0, then kappa is a feasible solution
+        Aj =  (Hv[j].T @ (desired_coord - vk))
+
+        kappa = Bj / Aj
+
+        return kappa
 
     
     ts1 = time_steps 
@@ -878,13 +897,14 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
         #Update the reference governor if ts1 > ts
         if (t % ts1) < time_steps:
 
-            k, kappa = rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1])  # rg function call
+            kappa = rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i)  # rg function call
 
             vk = vk + kappa * (desired_coord - vk)  # Update vk
 
         # Compute state updates
+        u = -K @ xx[:12, i-1] + Kc @ xx[12:16, i-1]
         xx[12:16, i] = xx[12:16, i - 1] + (vk - xx[1, i - 1:i]) * time_steps  # Update for states 13 to 16
-        xx[:12, i] = linear_dynamics_integral(i, xx[:12, i-1], Acl, Bcl, target_state) * time_steps + x0  # Update for states 1 to 12
+        xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:12, i-1], u) * time_steps  # Update for states 1 to 12
 
 
     # Create subplots
