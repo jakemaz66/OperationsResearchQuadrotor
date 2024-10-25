@@ -80,7 +80,7 @@ def nonlinear_dynamics(t, curstate, target_state, bounds):
     # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
     uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
     vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
-    wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / m)
+    wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / Mq)
 
     # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
     pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
@@ -154,10 +154,11 @@ def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
     uc = (target_state[[1, 3, 5, 11]] - curstate_integral[[1, 3, 5, 11]])
 
     Dotx = Ac @ curstate_integral + Bc @ uc
-    return Dotx
+    return Dotx 
 
 
 def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, bounds):
+    
 
     u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = curstate_integral
     force_bound, torque_bound = bounds
@@ -165,8 +166,8 @@ def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, boun
     target_state = np.array(target_state)
     curstate_integral = np.array(curstate_integral)
 
-    error = target_state[:12] - curstate_integral[:12] 
-    integral_error = target_state[12:] - curstate_integral[12:] 
+    error = curstate_integral[:12]  - target_state[:12] 
+    integral_error = curstate_integral[12:] - target_state[12:] 
 
     #Implementing integral control
     control = -K @ error - Kc @ integral_error
@@ -257,7 +258,7 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
     #At each time-step, update the position array x_tot with the linear_dynamics
     for j in range (1, total_time_steps):
         x0 = linear_dynamics_integral(j, x0, Acl, Bcl, target_state) * time_step + x0
-        x_tot[:, j] = x0
+        x_tot[:, j] = x0 * 2
 
     # Create subplots
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
@@ -818,16 +819,16 @@ if __name__ == '__main__':
 
     target_state = [
         0, 10,   # velocity and position on x
-        0, 10,    # velocity and position on y
-        0, 10,    # velocity and position on z
+        0, 0,    # velocity and position on y
+        0, 0,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0]     # angular velocity and position psi ]
 
     target_state_integral = [
-        0, 1,   # velocity and position on x
-        0, 10,    # velocity and position on y
-        0, 10,    # velocity and position on z
+        0, 3,   # velocity and position on x
+        0, 3,    # velocity and position on y
+        0, 3,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha                                                       
         0, 0,     # angular velocity and position psi ]
@@ -837,8 +838,8 @@ if __name__ == '__main__':
     # if no bounds are passed default will be unbounded (bounds = 0)
 
     # Run simulation
-    simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
-    #simulate_linear_integral_with_euler(target_state=target_state_integral)
+    #simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
+    simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
     #simulate_quadrotor_nonlinear_controller(target_state)
