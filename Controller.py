@@ -771,94 +771,152 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
     #ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
     ell_star = 1000
 
-    # Time interval for the continuous-time system
+    #Time interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
 
-    # Number of time steps for Euler’s method loop
+    #Number of time steps for Euler’s method loop
     N = len(time_interval)
 
-    # S is a constraint matrix that uses the feedback matrices K and Kc
+    #S is a constraint matrix that uses the feedback matrices K and Kc. S @ x needs to be less than the constraints
     S = np.block([[-K, Kc], [K, -Kc]])
 
-    # Defining the blocks for integral control
+    #Defining the blocks for integral control, we need to use discrete versions of A_cl and B_cl
+    #so we obtain Ad and Bd
     Ac = np.zeros((4, 4))
     Bc = np.eye(4)
 
     Acl = np.block([
-        [A - B @ K, B @ Kc],  # Block 1: A-BK and BKc
-        [-Bc @ C, Ac]         # Block 2: -BcC and Ac
+        [A - B @ K, B @ Kc],  
+        [-Bc @ C, Ac]         
     ])
 
     Bcl = np.vstack([np.zeros((12, 4)), Bc])
     Ccl = np.hstack((C, np.zeros((C.shape[0], C.shape[0]))))
-
-    # Remove duplicate Dcl initialization
     Dcl = np.zeros((C.shape[0], B.shape[1]))
 
     sys = ctrl.ss(Acl, Bcl, Ccl, Dcl)
     sysd = ctrl.c2d(sys, time_steps)
 
+    #The final discrete matrices to use in the closed-loop system
     Ad = sysd.A
     Bd = sysd.B
 
-    # This function constructs the constraint matrix Hx
+    #This function constructs the constraint matrix Hx
     def construct_Hx(S, A, x, ell_star):
+
         Hx = []
+
         for l in range(ell_star + 1):
-            Hx.append(S @ np.linalg.matrix_power(A, l))  # Construct Hx with matrix power
+
+            Hx.append(S @ x)  
+
         return np.vstack(Hx)
 
-    # This function constructs the constraint matrix Hv
-    def construct_Hv(S, A, B, ell_star):
-        Hv = [np.zeros((S.shape[0], B.shape[1]))]  # First block is zero
+
+    #This function constructs the constraint matrix Hv
+    def construct_Hv(S, A, B, ell_star, state):
+        # Convert A to a diagonal matrix
+        A_diag = np.diag(state)
+
+        #Identity matrix of the same size as A_diag
+        I = np.eye(A_diag.shape[0])
+
+        #Compute (I - A) and (I - A^ell_star)
+        I_minus_A = I - A_diag
+        I_minus_A_ell_star = np.linalg.matrix_power(I_minus_A, ell_star)
+
+        #Compute the inverse of (I - A)
+        I_minus_A_inv = np.linalg.inv(I_minus_A)
+
+        #Compute the entire expression
+        result = S @ I_minus_A_inv @ I_minus_A_ell_star @ B
+
+        Hv = [np.zeros((S.shape[0], B.shape[1]))]  
         for l in range(1, ell_star + 1):
-            Hv.append(S @ np.linalg.matrix_power(A, l-1) @ B)  # Construct Hv
+
+            Hv.append(S @ B)  
+
+        #Last element
+        Hv.append(result)
+            
         return np.vstack(Hv)
 
-    # This function constructs h
+    #This function constructs h
     def construct_h(s, epsilon, ell_star):
+
         h = [s] * ell_star
-        h.append(s - epsilon)  # Last element is s - epsilon
+
+        #Last element is s - epsilon
+        h.append(s - epsilon) 
+
         return np.array(h).reshape(-1, 1)
 
-    # Example ell_star, initialize constraints and states
+    #Constructing contraint matrices and constraint vector s
     Hx = construct_Hx(S, Ad, x0, ell_star)
-    Hv = construct_Hv(S, Ad, Bd, ell_star)
+    Hv = construct_Hv(S, Ad, Bd, ell_star, x0)
     s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005]).T
     h = construct_h(s, 0.005, ell_star)
 
-    # Initialize x array (evolving state over time)
-    xx = np.zeros((16, N))  # Assuming 16 states, N time steps
-    xx[:, 0] = x0.flatten()  # Set initial state
+    #Initialize x array (evolving state over time)
+    xx = np.zeros((16, N))  
+    xx[:, 0] = x0.flatten()  
 
-    # qds_dt function
-    def qds_dt(x, u):
-        return A @ x + B @ u
+
+    #The discrete control function, have to use discrete versions Ad and Bd of matrices A and B
+    def qds_dt(x, u, Ad, Bd):
+        return Ad @ x + Bd @ u
 
     # Reference governor computation
     def rg(Hx, Hv, h, desired_coord, vk, state, j):
-        Bj = h[j] - (Hx[j] @ state) - (Hv[j].T @ vk)  # Bj computation
-        Aj = Hv[j].T @ (desired_coord - vk)           # Aj computation
+        """The scalar reference governor returns a scalar values (one) representing the maximum feasible step
+           toward the desired coordinates.
+
+        Args:
+            Hx (matrix): A constraint matrix
+            Hv (matrix): A constraint matrix
+            h (matrix): A constraint matrix
+            desired_coord (vector): _description_
+            vk (_type_): _description_
+            state (_type_): _description_
+            j (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        #Bj always > 0 since v_t-1 is always feasible
+        Bj = h[j] - (Hx[j] @ state) - (Hv[j].T @ vk)  
+
+        Aj = Hv[j].T @ (desired_coord - vk)           
         
-        if Aj == 0:  # Check for division by zero
-            return 0
-        
-        kappa = Bj / Aj  # Feasibility check for kappa
+        kappa = Bj / Aj  
+
         return kappa
 
-    # Compute matrices for reference governor (simulation loop)
+
+    #Main simulation loop
     for i in range(1, N):
+
         t = (i - 1) * time_steps
+
         if (t % time_steps) < time_steps:
-            kappa = rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1)  # rg function call
-            vk = vk + kappa * (desired_coord - vk)  # Update vk
 
-        # Compute state updates
+            #Getting kappa from reference governor
+            kappa = rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1) 
+
+            #Updating vk
+            vk = vk + kappa * (desired_coord - vk)  
+
+        #Getting integral control u
         u = -K @ xx[:12, i-1] + Kc @ xx[12:16, i-1]
-        xx[12:16, i] = xx[12:16, i - 1] + np.dot((vk - xx[1, i - 1:i]), time_steps).reshape(4) # Update for states 13 to 16
-        xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:12, i-1], u) * time_steps  # Update for states 1 to 12
 
-    # Create subplots
+        #Updating integral states with control and error
+        xx[12:16, i] = xx[12:16, i-1] + (vk - np.array([xx[1, i-1], xx[3, i-1], xx[5, i-1], xx[11, i-1]])) * time_steps
+
+        #Updating initial 12 states with control and Euler
+        xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:12, i-1], u, Ad, Bd) * time_steps  
+
+    
+    #Plotting results
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
     fig.suptitle("Simulating with Euler and Non-linear Integral Control")
 
