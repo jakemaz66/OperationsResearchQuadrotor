@@ -40,18 +40,7 @@ def nonlinear_dynamics(t, curstate, target_state, bounds):
     force_bound, torque_bound = bounds
 
     # Initialize an empty list to store the errors
-    error = []
-
-    # Iterate exactly 12 times (assuming target_state and curstate have at least 12 elements)
-    for i in range(12):
-        target = target_state[i]
-        state = curstate[i]
-
-        # Compute the difference between target and state
-        difference = state - target
-
-        # Append the result to the error list
-        error.append(difference)
+    error = curstate - target_state
 
     # Controlling by multiplying error by negative feedback matrix K "−K(x−xeq)"
     control = -K @ (error)
@@ -801,20 +790,68 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
     Ad = sysd.A
     Bd = sysd.B
 
+    def predict_future_state(Ad, xt, B, vk, ell):
+        """
+        Predicts the future state xhat at time step ell based on the current state xt, input v, 
+        and matrices Ad and B.
+
+        Args:
+            Ad (numpy.ndarray): The discrete-time system matrix.
+            xt (numpy.ndarray): The current state vector.
+            B (numpy.ndarray): The input matrix.
+            v (numpy.ndarray): The control input vector.
+            ell (int): The number of time steps ahead to predict.
+
+        Returns:
+            numpy.ndarray: The predicted future state xhat.
+        """
+
+        # Calculate A_d^ℓ
+        Ad_ell = np.linalg.matrix_power(Ad, ell)
+
+        # Calculate (I - A_d)^(-1)
+        I = np.eye(Ad.shape[0])
+        Ad_inv_term = np.linalg.inv(I - Ad)
+
+        # Calculate (I - A_d^ℓ)
+        I_minus_Ad_ell = I - Ad_ell
+
+        # Calculate the future state
+        xhat = Ad_ell @ xt + (Ad_inv_term @ I_minus_Ad_ell @ B @ vk).reshape(16)
+
+        return xhat
+
     #This function constructs the constraint matrix Hx
-    def construct_Hx(S, A, x, ell_star):
+    def construct_Hx(S, Ad, x, ell_star, vk, Bd):
+        """Construct the Hx contraint matrix Hx
+
+        Args:
+            S (matrix): A constraint matrix of K and Kc
+            Ad (matrix): Discrete A control matrix
+            x (vector): Future update of state using "predict_future_state()" function
+            ell_star (int): number of iterations (timesteps)
+
+        Returns:
+            matrix: The constraint matrix Hx
+        """
 
         Hx = []
 
-        for l in range(ell_star + 1):
+        Hx.append(S @ x)
 
-            Hx.append(S @ x)  
+        for ell in range(ell_star + 1):
+
+            x = predict_future_state(Ad, x, Bd, vk, ell)
+
+            Ax = np.linalg.matrix_power(Ad, ell) @ x
+
+            Hx.append(S @ Ax)  
 
         return np.vstack(Hx)
 
 
     #This function constructs the constraint matrix Hv
-    def construct_Hv(S, A, B, ell_star, state):
+    def construct_Hv(S, Ad, Bd, ell_star, state):
         # Convert A to a diagonal matrix
         A_diag = np.diag(state)
 
@@ -829,12 +866,13 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
         I_minus_A_inv = np.linalg.inv(I_minus_A)
 
         #Compute the entire expression
-        result = S @ I_minus_A_inv @ I_minus_A_ell_star @ B
+        result = S @ I_minus_A_inv @ I_minus_A_ell_star @ Bd
 
-        Hv = [np.zeros((S.shape[0], B.shape[1]))]  
-        for l in range(1, ell_star + 1):
+        Hv = [np.zeros((S.shape[0], Bd.shape[1]))]  
 
-            Hv.append(S @ B)  
+        for elll in range(1, ell_star + 1):
+
+            Hv.append(S @ Bd)  
 
         #Last element
         Hv.append(result)
@@ -849,10 +887,10 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
         #Last element is s - epsilon
         h.append(s - epsilon) 
 
-        return np.array(h).reshape(-1, 1)
+        return np.array(h)
 
     #Constructing contraint matrices and constraint vector s
-    Hx = construct_Hx(S, Ad, x0, ell_star)
+    Hx = construct_Hx(S, Ad, x0, ell_star, vk, Bd)
     Hv = construct_Hv(S, Ad, Bd, ell_star, x0)
     s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005]).T
     h = construct_h(s, 0.005, ell_star)
@@ -947,8 +985,8 @@ if __name__ == '__main__':
 
     target_state = [
         0, 10,   # velocity and position on x
-        0, 0,    # velocity and position on y
-        0, 0,    # velocity and position on z
+        0, 10,    # velocity and position on y
+        0, 10,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0]     # angular velocity and position psi ]
@@ -979,8 +1017,8 @@ if __name__ == '__main__':
 
     #clear_bound_values()
     SRG_Simulation()
-    simulate_figure_8()
-    simulate_quadrotor_nonlinear_controller(target_state=target_state)
+    #simulate_figure_8()
+    #simulate_quadrotor_nonlinear_controller(target_state=target_state)
     print(f'Max force before bound: {np.max(force_before_bound)}')
     print(f'Max force after bound: {np.max(force_after_bound)}')
 
