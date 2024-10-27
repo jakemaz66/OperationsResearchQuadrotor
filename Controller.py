@@ -2,6 +2,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 from scipy.signal import StateSpace, cont2discrete
+from scipy.integrate import odeint
 import control as ctrl
 
 # All parameters are in seperate file and imported here.
@@ -140,16 +141,15 @@ def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
 
     target_state = np.array(target_state)
     curstate_integral = np.array(curstate_integral)
-    
-    #Getting 4x1 Integral u
+
+    # Getting 4x1 Integral u
     uc = (target_state[[1, 3, 5, 11]] - curstate_integral[[1, 3, 5, 11]])
 
     Dotx = Ac @ curstate_integral + Bc @ uc
-    return Dotx 
+    return Dotx
 
 
 def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, bounds):
-    
 
     u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = curstate_integral
     force_bound, torque_bound = bounds
@@ -157,10 +157,10 @@ def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, boun
     target_state = np.array(target_state)
     curstate_integral = np.array(curstate_integral)
 
-    error = curstate_integral[:12]  - target_state[:12] 
-    integral_error = curstate_integral[12:] - target_state[12:] 
+    error = curstate_integral[:12] - target_state[:12]
+    integral_error = curstate_integral[12:] - target_state[12:]
 
-    #Implementing integral control
+    # Implementing integral control
     control = -K @ error - Kc @ integral_error
 
     F = control[0] + Mq * g  # Force -> Throttle
@@ -201,7 +201,8 @@ def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, boun
     PzDot = w
 
     # u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r
-    state_change = [uDot, PxDot, vDot, PyDot, wDot, PzDot, pDot, p, qDot, q, rDot, r, i1, i2, i3, i4]
+    state_change = [uDot, PxDot, vDot, PyDot, wDot,
+                    PzDot, pDot, p, qDot, q, rDot, r, i1, i2, i3, i4]
 
     state = []
     for el in state_change:
@@ -211,7 +212,7 @@ def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, boun
     return state
 
 
-def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                         total_time=10, time_step=0.00001):
     """This method simulates flight using the Euler method
 
@@ -220,19 +221,19 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
         initial_state (list, optional): The initial state of quadrotor. Defaults to [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].
     """
 
-    #Constructing time steps
+    # Constructing time steps
     time_range = np.arange(0, total_time + time_step, time_step)
     total_time_steps = len(time_range)
 
     x0 = np.zeros(16,)
 
-    #12 is the number of state elements, total_time_steps is the state at each time step
+    # 12 is the number of state elements, total_time_steps is the state at each time step
     x_tot = np.zeros((16, total_time_steps))
 
-    #The first time step is equal to the initial state of the quadrotor
+    # The first time step is equal to the initial state of the quadrotor
     x_tot[:, 0] = initial_state
 
-    #Defining the blocks for integral control
+    # Defining the blocks for integral control
     Ac = np.zeros((4, 4))
     Bc = np.eye(4)
 
@@ -246,15 +247,16 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
     )
     Bcl = np.vstack([np.zeros((12, 4)), Bc])
 
-    #At each time-step, update the position array x_tot with the linear_dynamics
-    for j in range (1, total_time_steps):
-        x0 = linear_dynamics_integral(j, x0, Acl, Bcl, target_state) * time_step + x0
+    # At each time-step, update the position array x_tot with the linear_dynamics
+    for j in range(1, total_time_steps):
+        x0 = linear_dynamics_integral(
+            j, x0, Acl, Bcl, target_state) * time_step + x0
         x_tot[:, j] = x0 * 2
 
     # Create subplots
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
     fig.suptitle("Simulating with Euler and Linear Integral Control")
-    
+
     # Change in X over time
     axs[0, 0].plot(time_range, x_tot[1, :], label='X Change')
     axs[0, 0].set_title('Change in X')
@@ -275,7 +277,8 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
 
     # 3D Trajectory Plot
     ax3d = fig.add_subplot(2, 2, 4, projection='3d')
-    ax3d.plot(x_tot[1, :], x_tot[3, :], x_tot[5, :], label='3D Trajectory', color='red')
+    ax3d.plot(x_tot[1, :], x_tot[3, :], x_tot[5, :],
+              label='3D Trajectory', color='red')
     ax3d.set_title('3D Trajectory')
     ax3d.set_xlabel('X Position')
     ax3d.set_ylabel('Y Position')
@@ -286,8 +289,8 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
     plt.show()
 
 
-def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
-                                        total_time=10, time_step=0.0001, bounds=(0,0)):
+def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                                           total_time=10, time_step=0.0001, bounds=(0, 0)):
     """This method simulates flight using the Euler method
 
     Args:   
@@ -295,29 +298,30 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
         initial_state (list, optional): The initial state of quadrotor. Defaults to [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].
     """
 
-    #Constructing time steps
+    # Constructing time steps
     time_range = np.arange(0, total_time + time_step, time_step)
     total_time_steps = len(time_range)
 
     x0 = np.zeros(16,)
 
-    #12 is the number of state elements, total_time_steps is the state at each time step
+    # 12 is the number of state elements, total_time_steps is the state at each time step
     x_tot = np.zeros((16, total_time_steps))
 
-    #The first time step is equal to the initial state of the quadrotor
+    # The first time step is equal to the initial state of the quadrotor
     x_tot[:, 0] = initial_state
     Acl = None
     Bcl = None
 
-    #At each time-step, update the position array x_tot with the linear_dynamics
-    for j in range (1, total_time_steps):
-        x0 = np.array(nonlinear_dynamics_integral(j, x0, Acl, Bcl, target_state, bounds)) * time_step + x0
+    # At each time-step, update the position array x_tot with the linear_dynamics
+    for j in range(1, total_time_steps):
+        x0 = np.array(nonlinear_dynamics_integral(
+            j, x0, Acl, Bcl, target_state, bounds)) * time_step + x0
         x_tot[:, j] = x0
 
     # Create subplots
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
     fig.suptitle("Simulating with Euler and Non-linear Integral Control")
-    
+
     # Change in X over time
     axs[0, 0].plot(time_range, x_tot[1, :], label='X Change')
     axs[0, 0].set_title('Change in X')
@@ -338,7 +342,8 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
 
     # 3D Trajectory Plot
     ax3d = fig.add_subplot(2, 2, 4, projection='3d')
-    ax3d.plot(x_tot[1, :], x_tot[3, :], x_tot[5, :], label='3D Trajectory', color='red')
+    ax3d.plot(x_tot[1, :], x_tot[3, :], x_tot[5, :],
+              label='3D Trajectory', color='red')
     ax3d.set_title('3D Trajectory')
     ax3d.set_xlabel('X Position')
     ax3d.set_ylabel('Y Position')
@@ -652,26 +657,11 @@ def clear_bound_values():
     tauPsi_after_bound.clear()
 
 
-def figure_8_trajectory(t_steps, A, B, omega, z0):
-    """The figure eight dynamics given by Dr. Romagnoli in the project writeup. The goal is to get the quadrotor
-       to follow a figure eight trajectory.
-
-    Args:
-        t (float): The time steps of the simulation
-        A (float): The amplitude along the x-axis
-        B (float): The amplitude along the y-axis
-        omega (float):  The angular velocity
-        z0 (float): The constant altitude
-
-    Returns:
-        array: A vector of the trajectory (3 coordinates)
-    """
-
-    x_t = A * np.sin(omega * t_steps)
-    y_t = B * np.sin(2 * omega * t_steps)
-    z_t = z0
-
-    return np.array([x_t, y_t, z_t])
+def ode(x, t, K, A, B, target_state):
+    error = x - target_state
+    control = -K @ error
+    dx = A @ x + B @ control
+    return dx
 
 
 def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
@@ -684,99 +674,123 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
         z0 (float): constant altitude
     """
 
-    # 5000 timesteps inbetween 0 and 10 seconds
-    time_interval_range = np.linspace(0, 30, 50000)
-    time_step = 20/5000
+    # Simulate only for one full time period T (start and end at the same point)
+    T = 2*np.pi/omega
+    # Number of time steps, this determines the precision of the figure-8 trajectory
+    tt = np.linspace(0, T, 1000)
 
     # Obtaining the coordinates (trajectory) for each timestep in time_interval_range
-    trajectory = np.array([figure_8_trajectory(
-        t_steps=t, A=At, B=Bt, omega=omega, z0=z0) for t in time_interval_range])
-    
-    #Constructing time steps
-    total_time_steps = len(time_interval_range)
+    # Since z0 is constant, we'll add it manually here.
+    x = At * np.sin(omega * tt)
+    y = Bt * np.sin(2 * omega * tt)
 
-    x0 = np.zeros(12,)
+    # Create waypoints to represent target state at each time step in tt
+    target_state = np.array([
+        [0, x[i], 0, y[i], 0, z0, 0, 0, 0, 0, 0, 0]
+        for i in range(len(tt))
+    ])
 
-    #12 is the number of state elements, total_time_steps is the state at each time step
-    x_tot = np.zeros((12, total_time_steps))
+    # Create a zero state, because it has to start from (0, 0, 0) and move to (0, 0, 1) before starting the figure-8
+    zero_state = np.zeros(12)
+    target_state = np.vstack((zero_state, target_state))
 
-    #The first time step is equal to the initial state of the quadrotor
-    x_tot[:, 0] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    # This is to remember the whole journey including intermediate steps between waypoints
+    x_ode_trajectory = []
 
-    #At each time-step, update the position array x_tot with the linear_dynamics
-    for j in range (1, total_time_steps):
-        target_state = np.array([0, trajectory[j][0], 0, trajectory[j][1], 0, trajectory[j][2], omega, 0, omega, 0, omega, 0])
-        x0 = linear_dynamics(j, x0, A, B, target_state, (0, 0)) * time_step + x0
-        x_tot[:, j] = x0
+    # Now make it move according to the new target states
+    for i in range(1, len(tt)):
+        x_ode = odeint(ode, target_state[i-1],
+                       tt, args=(K, A, B, target_state[i]))
+        x_ode_trajectory.append(x_ode)
 
-    # Creating subplots for the figure-8 graphics
-    fig, axs = plt.subplots(2, 2, figsize=(16, 10))
-    fig.suptitle(f"Quadrotor Figure-8 Path\nHaving parameters Amplitude X: {At}, Amplitude Y: {Bt}, and Angular Velocity {omega}",
-                 fontsize=12)
+    # Converting the python list into numpy array
+    x_ode_trajectory = np.concatenate(x_ode_trajectory)
 
-    # Plotting trajectory in X-Y plane (Figure-8 Path)
-    axs[0, 0].plot(trajectory[:, 0], trajectory[:, 1],
-                   label="Path of Quadrotor in Figure Eight")
-    axs[0, 0].set_xlabel('X meters')
-    axs[0, 0].set_ylabel('Y meters')
-    axs[0, 0].set_title("Quadrotor Figure-8 Path")
+    # Extract x, y, z from indices 1, 3, and 5 in x_ode_trajectory
+    x_vals = x_ode_trajectory[:, 1]
+    y_vals = x_ode_trajectory[:, 3]
+    z_vals = x_ode_trajectory[:, 5]
+    time_vals = np.linspace(0, T, len(x_ode_trajectory))
+
+    # Plotting
+    fig = plt.figure(figsize=(18, 12))
+    fig.suptitle(f"Quadrotor Figure-8 Path\nWith Amplitude X: {At}, Amplitude Y: {
+                 Bt}, and Angular Velocity {omega}", fontsize=14)
+
+    # Create 2x2 subplots
+    axs = fig.add_subplot(2, 2, 1)
+    axs.set_title("Quadrotor Figure-8 Path")
+    axs.plot(x_vals, y_vals, label="Path of Quadrotor in Figure Eight")
+    axs.set_xlabel("X (meters)")
+    axs.set_ylabel("Y (meters)")
 
     # Plotting X-coordinate over time
-    axs[0, 1].plot(time_interval_range, trajectory[:, 0],
-                   label="Change in X-coordinate over time")
-    axs[0, 1].set_xlabel('Time')
-    axs[0, 1].set_ylabel('X meters')
-    axs[0, 1].set_title("X-Coordinates of the Quadrotor Over Time")
+    axs = fig.add_subplot(2, 2, 2)
+    axs.plot(time_vals, x_vals, label="X-coordinate over time")
+    axs.set_xlabel("Time (seconds)")
+    axs.set_ylabel("X (meters)")
+    axs.set_title("X-Coordinates of the Quadrotor Over Time")
 
     # Plotting Y-coordinate over time
-    axs[1, 0].plot(time_interval_range, trajectory[:, 1],
-                   label="Change in Y-coordinate over time")
-    axs[1, 0].set_xlabel('Time')
-    axs[1, 0].set_ylabel('Y meters')
-    axs[1, 0].set_title("Y-Coordinates of the Quadrotor Over Time")
+    axs = fig.add_subplot(2, 2, 3)
+    axs.plot(time_vals, y_vals, label="Y-coordinate over time")
+    axs.set_xlabel("Time (seconds)")
+    axs.set_ylabel("Y (meters)")
+    axs.set_title("Y-Coordinates of the Quadrotor Over Time")
 
-    # Plotting Z-coordinate over time
-    axs[1, 1].plot(time_interval_range, trajectory[:, 2],
-                   label="Change in Z-coordinate over time")
-    axs[1, 1].set_xlabel('Time')
-    axs[1, 1].set_ylabel('Z meters')
-    axs[1, 1].set_title("Z-Coordinates of the Quadrotor Over Time")
+    # Plotting Z-coordinate over time (constant altitude)
+    axs = fig.add_subplot(2, 2, 4)
+    axs.plot(time_vals, z_vals, label="Z-coordinate over time")
+    axs.set_xlabel("Time (seconds)")
+    axs.set_ylabel("Z (meters)")
+    axs.set_title("Z-Coordinates of the Quadrotor Over Time")
+
+    # Adding a 3D plot to show x_vals, y_vals, and z_vals trajectory
+    fig_3d = plt.figure(figsize=(10, 8))
+    ax_3d = fig_3d.add_subplot(111, projection='3d')
+    ax_3d.plot(x_vals, y_vals, z_vals,
+               label="3D Path of Quadrotor in Figure Eight")
+    ax_3d.set_xlabel("X (meters)")
+    ax_3d.set_ylabel("Y (meters)")
+    ax_3d.set_zlabel("Z (meters)")
+    ax_3d.set_title("3D Trajectory of Quadrotor Figure-8 Path")
+    ax_3d.legend()
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
 
-def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
+def SRG_Simulation(time_steps=0.01, desired_coord=[1, 1, 1, 0]):
 
-    #x0 is the inital state of the quadrotor
-    x0 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
+    # x0 is the inital state of the quadrotor
+    x0 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
-    #Transforming the desired (target) point into a 4x1 vector
-    desired_coord = np.array(desired_coord).reshape(-1, 1)  
-    
-    #Initial feasible control vk (the first valid point along the line from A to B), this serves as the starting point
-    vk = 0.01 * desired_coord  
+    # Transforming the desired (target) point into a 4x1 vector
+    desired_coord = np.array(desired_coord).reshape(-1, 1)
 
-    #ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
+    # Initial feasible control vk (the first valid point along the line from A to B), this serves as the starting point
+    vk = 0.01 * desired_coord
+
+    # ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
     ell_star = 1000
 
-    #Time interval for the continuous-time system
+    # Time interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
 
-    #Number of time steps for Euler’s method loop
+    # Number of time steps for Euler’s method loop
     N = len(time_interval)
 
-    #S is a constraint matrix that uses the feedback matrices K and Kc. S @ x needs to be less than the constraints
+    # S is a constraint matrix that uses the feedback matrices K and Kc. S @ x needs to be less than the constraints
     S = np.block([[-K, Kc], [K, -Kc]])
 
-    #Defining the blocks for integral control, we need to use discrete versions of A_cl and B_cl
-    #so we obtain Ad and Bd
+    # Defining the blocks for integral control, we need to use discrete versions of A_cl and B_cl
+    # so we obtain Ad and Bd
     Ac = np.zeros((4, 4))
     Bc = np.eye(4)
 
     Acl = np.block([
-        [A - B @ K, B @ Kc],  
-        [-Bc @ C, Ac]         
+        [A - B @ K, B @ Kc],
+        [-Bc @ C, Ac]
     ])
 
     Bcl = np.vstack([np.zeros((12, 4)), Bc])
@@ -786,7 +800,7 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
     sys = ctrl.ss(Acl, Bcl, Ccl, Dcl)
     sysd = ctrl.c2d(sys, time_steps)
 
-    #The final discrete matrices to use in the closed-loop system
+    # The final discrete matrices to use in the closed-loop system
     Ad = sysd.A
     Bd = sysd.B
 
@@ -817,11 +831,12 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
         I_minus_Ad_ell = I - Ad_ell
 
         # Calculate the future state
-        xhat = Ad_ell @ xt + (Ad_inv_term @ I_minus_Ad_ell @ B @ vk).reshape(16)
+        xhat = Ad_ell @ xt + \
+            (Ad_inv_term @ I_minus_Ad_ell @ B @ vk).reshape(16)
 
         return xhat
 
-    #This function constructs the constraint matrix Hx
+    # This function constructs the constraint matrix Hx
     def construct_Hx(S, Ad, x, ell_star, vk, Bd):
         """Construct the Hx contraint matrix Hx
 
@@ -845,62 +860,62 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
 
             Ax = np.linalg.matrix_power(Ad, ell) @ x
 
-            Hx.append(S @ Ax)  
+            Hx.append(S @ Ax)
 
         return np.vstack(Hx)
 
+    # This function constructs the constraint matrix Hv
 
-    #This function constructs the constraint matrix Hv
     def construct_Hv(S, Ad, Bd, ell_star, state):
         # Convert A to a diagonal matrix
         A_diag = np.diag(state)
 
-        #Identity matrix of the same size as A_diag
+        # Identity matrix of the same size as A_diag
         I = np.eye(A_diag.shape[0])
 
-        #Compute (I - A) and (I - A^ell_star)
+        # Compute (I - A) and (I - A^ell_star)
         I_minus_A = I - A_diag
         I_minus_A_ell_star = np.linalg.matrix_power(I_minus_A, ell_star)
 
-        #Compute the inverse of (I - A)
+        # Compute the inverse of (I - A)
         I_minus_A_inv = np.linalg.inv(I_minus_A)
 
-        #Compute the entire expression
+        # Compute the entire expression
         result = S @ I_minus_A_inv @ I_minus_A_ell_star @ Bd
 
-        Hv = [np.zeros((S.shape[0], Bd.shape[1]))]  
+        Hv = [np.zeros((S.shape[0], Bd.shape[1]))]
 
         for elll in range(1, ell_star + 1):
 
-            Hv.append(S @ Bd)  
+            Hv.append(S @ Bd)
 
-        #Last element
+        # Last element
         Hv.append(result)
-            
+
         return np.vstack(Hv)
 
-    #This function constructs h
+    # This function constructs h
     def construct_h(s, epsilon, ell_star):
 
         h = [s] * ell_star
 
-        #Last element is s - epsilon
-        h.append(s - epsilon) 
+        # Last element is s - epsilon
+        h.append(s - epsilon)
 
         return np.array(h)
 
-    #Constructing contraint matrices and constraint vector s
+    # Constructing contraint matrices and constraint vector s
     Hx = construct_Hx(S, Ad, x0, ell_star, vk, Bd)
     Hv = construct_Hv(S, Ad, Bd, ell_star, x0)
     s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005]).T
     h = construct_h(s, 0.005, ell_star)
 
-    #Initialize x array (evolving state over time)
-    xx = np.zeros((16, N))  
-    xx[:, 0] = x0.flatten()  
+    # Initialize x array (evolving state over time)
+    xx = np.zeros((16, N))
+    xx[:, 0] = x0.flatten()
 
+    # The discrete control function, have to use discrete versions Ad and Bd of matrices A and B
 
-    #The discrete control function, have to use discrete versions Ad and Bd of matrices A and B
     def qds_dt(x, u, Ad, Bd):
         return Ad @ x + Bd @ u
 
@@ -921,40 +936,41 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
         Returns:
             _type_: _description_
         """
-        #Bj always > 0 since v_t-1 is always feasible
-        Bj = h[j] - (Hx[j] @ state) - (Hv[j].T @ vk)  
+        # Bj always > 0 since v_t-1 is always feasible
+        Bj = h[j] - (Hx[j] @ state) - (Hv[j].T @ vk)
 
-        Aj = Hv[j].T @ (desired_coord - vk)           
-        
-        kappa = Bj / Aj  
+        Aj = Hv[j].T @ (desired_coord - vk)
+
+        kappa = Bj / Aj
 
         return kappa
 
-
-    #Main simulation loop
+    # Main simulation loop
     for i in range(1, N):
 
         t = (i - 1) * time_steps
 
         if (t % time_steps) < time_steps:
 
-            #Getting kappa from reference governor
-            kappa = rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1) 
+            # Getting kappa from reference governor
+            kappa = rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1)
 
-            #Updating vk
-            vk = vk + kappa * (desired_coord - vk)  
+            # Updating vk
+            vk = vk + kappa * (desired_coord - vk)
 
-        #Getting integral control u
+        # Getting integral control u
         u = -K @ xx[:12, i-1] + Kc @ xx[12:16, i-1]
 
-        #Updating integral states with control and error
-        xx[12:16, i] = xx[12:16, i-1] + (vk - np.array([xx[1, i-1], xx[3, i-1], xx[5, i-1], xx[11, i-1]])) * time_steps
+        # Updating integral states with control and error
+        xx[12:16, i] = xx[12:16, i-1] + \
+            (vk - np.array([xx[1, i-1], xx[3, i-1],
+             xx[5, i-1], xx[11, i-1]])) * time_steps
 
-        #Updating initial 12 states with control and Euler
-        xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:12, i-1], u, Ad, Bd) * time_steps  
+        # Updating initial 12 states with control and Euler
+        xx[:12, i] = xx[:12, i-1] + \
+            qds_dt(xx[:12, i-1], u, Ad, Bd) * time_steps
 
-    
-    #Plotting results
+    # Plotting results
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
     fig.suptitle("Simulating with Euler and Non-linear Integral Control")
 
@@ -996,37 +1012,37 @@ if __name__ == '__main__':
         0, 3,    # velocity and position on y
         0, 3,    # velocity and position on z
         0, 0,     # angular velocity and position thi
-        0, 0,     # angular velocity and position thetha                                                       
+        0, 0,     # angular velocity and position thetha
         0, 0,     # angular velocity and position psi ]
         0, 0,     # Integral states are 0s
-        0, 0]     
+        0, 0]
 
     # if no bounds are passed default will be unbounded (bounds = 0)
 
     # Run simulation
-    #simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
-    #simulate_linear_integral_with_euler(target_state=target_state_integral)
+    # simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
+    # simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
-    #simulate_quadrotor_nonlinear_controller(target_state)
+    # simulate_quadrotor_nonlinear_controller(target_state)
     # print(f'Max force before bound: {np.max(force_before_bound)}')
     # print(f'Max force after bound: {np.max(force_after_bound)}')
 
     # clear_bound_values()
     # simulate_quadrotor_linear_controller(target_state, bounds=(0.4, 0))
 
-    #clear_bound_values()
-    SRG_Simulation()
-    #simulate_figure_8()
-    #simulate_quadrotor_nonlinear_controller(target_state=target_state)
-    print(f'Max force before bound: {np.max(force_before_bound)}')
-    print(f'Max force after bound: {np.max(force_after_bound)}')
+    # clear_bound_values()
+    # SRG_Simulation()
+    # simulate_figure_8()
+    # simulate_quadrotor_nonlinear_controller(target_state=target_state)
+    # print(f'Max force before bound: {np.max(force_before_bound)}')
+    # print(f'Max force after bound: {np.max(force_after_bound)}')
 
     clear_bound_values()
-    simulate_quadrotor_nonlinear_controller(
-        target_state=target_state, bounds=(6, 0))
+    # simulate_quadrotor_nonlinear_controller(
+    # target_state=target_state, bounds=(6, 0))
 
     # simulate_quadrotor_linear_integral_controller(target_state=target_state_integral)
 
     # Have not tested, or verified this simulate_figure_8 funtion
-    # simulate_figure_8(A=9, B=33, omega=.5, z0=12)
+    simulate_figure_8(At=9, Bt=33, omega=.5, z0=12)
