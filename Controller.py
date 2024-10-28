@@ -87,7 +87,7 @@ def nonlinear_dynamics(t, curstate, target_state, bounds):
     return [uDot, PxDot, vDot, PyDot, wDot, PzDot, pDot, p, qDot, q, rDot, r]
 
 
-def linear_dynamics(t, curstate, A, B, target_state, bounds):
+def linear_dynamics_ivp(t, curstate, A, B, target_state, bounds):
     """Modeling the linear dynamics of the quadrotor. The linear dynamics tell you how
        the state of the quadrotor changes with regards to two things
        1. The current state of the quadrotor
@@ -135,6 +135,13 @@ def linear_dynamics(t, curstate, A, B, target_state, bounds):
 
     xDot = (A @ curstate) + B @ control
     return xDot
+
+
+def linear_dynamics_ode(x, t, K, A, B, target_state):
+    error = x - target_state
+    control = -K @ error
+    dx = A @ x + B @ control
+    return dx
 
 
 def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
@@ -404,7 +411,7 @@ def simulate_quadrotor_linear_controller(target_state, initial_state=[0, 0, 0, 0
     """
 
     # Solve the linear dynamics using solve_ivp
-    sol_linear = solve_ivp(linear_dynamics, time_span, initial_state, args=(
+    sol_linear = solve_ivp(linear_dynamics_ivp, time_span, initial_state, args=(
         A, B, target_state, bounds), dense_output=True)
 
     # Obtain results from the solved differential equations
@@ -657,13 +664,6 @@ def clear_bound_values():
     tauPsi_after_bound.clear()
 
 
-def ode(x, t, K, A, B, target_state):
-    error = x - target_state
-    control = -K @ error
-    dx = A @ x + B @ control
-    return dx
-
-
 def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
     """This function simulates the flight of a quadrotor in a figure-eight trajectory
 
@@ -699,7 +699,7 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
 
     # Now make it move according to the new target states
     for i in range(1, len(tt)):
-        x_ode = odeint(ode, target_state[i-1],
+        x_ode = odeint(linear_dynamics_ode, target_state[i-1],
                        tt, args=(K, A, B, target_state[i]))
         x_ode_trajectory.append(x_ode)
 
