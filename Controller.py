@@ -21,7 +21,7 @@ tauTheta_after_bound = []
 tauPsi_after_bound = []
 
 
-def nonlinear_dynamics(t, curstate, target_state, bounds):
+def nonlinear_dynamics_ivp(t, curstate, target_state, bounds):
     """
     Modeling the non-linear dynamics of the quadrotor. The non-linear dynamics tell you how
        the state of the quadrotor changes with regards to three things
@@ -137,11 +137,44 @@ def linear_dynamics_ivp(t, curstate, A, B, target_state, bounds):
     return xDot
 
 
-def linear_dynamics_ode(x, t, K, A, B, target_state):
-    error = x - target_state
+def linear_dynamics_ode(current_state, t, K, A, B, target_state):
+    # We must have different functions for ode and ivp even though they perform the same calculation because the order of the arguments is different
+
+    error = current_state - target_state
     control = -K @ error
-    dx = A @ x + B @ control
+    dx = A @ current_state + B @ control
     return dx
+
+
+def nonlinear_dynamics_ode(current_state, t, K, target_state):
+    # We must have different functions for ode and ivp even though they perform the same calculation because the order of the arguments is different
+
+    error = current_state - target_state
+    control = -K @ error
+
+    F = control[0] + Mq * g  # Force -> Throttle
+    TauPhi = control[1]     # Roll torque
+    TauTheta = control[2]   # Pitch torque
+    TauPsi = control[3]     # Yaw Torque
+
+    u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r = current_state
+
+    # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
+    uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
+    vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
+    wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / Mq)
+
+    # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
+    pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
+    qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
+    rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
+
+    PxDot = u
+    PyDot = v
+    PzDot = w
+
+    # u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r
+    return [uDot, PxDot, vDot, PyDot, wDot, PzDot, pDot, p, qDot, q, rDot, r]
 
 
 def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
@@ -634,7 +667,7 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state=[0, 0, 0
         target_state: Goal state where drone needs to go to
     """
 
-    sol_nonlinear = solve_ivp(nonlinear_dynamics, time_span, initial_state, args=(
+    sol_nonlinear = solve_ivp(nonlinear_dynamics_ivp, time_span, initial_state, args=(
         target_state, bounds), dense_output=True)
 
     # x, y, z positions
@@ -699,8 +732,10 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
 
     # Now make it move according to the new target states
     for i in range(1, len(tt)):
-        x_ode = odeint(linear_dynamics_ode, target_state[i-1],
-                       tt, args=(K, A, B, target_state[i]))
+        # x_ode = odeint(linear_dynamics_ode, target_state[i-1],
+        #                tt, args=(K, A, B, target_state[i]))
+        x_ode = odeint(nonlinear_dynamics_ode, target_state[i-1],
+                       tt, args=(K, target_state[i]))
         x_ode_trajectory.append(x_ode)
 
     # Converting the python list into numpy array
