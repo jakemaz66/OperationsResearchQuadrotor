@@ -794,7 +794,7 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
     plt.show()
 
 
-def SRG_Simulation(time_steps=0.0001, desired_coord=[1, 1, 1, 0]):
+def SRG_Simulation(time_steps=0.0001, desired_coord=[0, 0, 10, 0]):
 
     #x0 is the inital state of the quadrotor (16 states for integral control)
     x0 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
@@ -1015,8 +1015,9 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[1, 1, 1, 0]):
         """
 
         return (Ad @ x + (Bd @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
+    
 
-    # Main simulation loop
+    #Main simulation loop
     ts1 = 0.2
     for i in range(1, N):
 
@@ -1034,13 +1035,14 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[1, 1, 1, 0]):
         #Integral control
         error = (vk.reshape(1, 4) - xx[[1, 3, 5, 11], i-1]) 
 
-        #Updating initial 12 states with control and Euler
+        #Updating initial 12 states with control and 
+        #Could be: x0 = np.array(predict_future_state(Ad, x0, Bd, vk, i)) * time_steps + x0
         x0 = np.array(qds_dt(xx[:, i-1], error, Acl, Bcl)) * time_steps + x0
         xx[:, i] = x0
 
     # Plotting results
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
-    fig.suptitle("Simulating with Euler and Non-linear Integral Control")
+    fig.suptitle("Reference Governor Simulation with Integral Control")
 
     # Change in X over time
     axs[0, 0].plot(time_interval, xx[0, :], label='X Change')
