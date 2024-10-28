@@ -748,13 +748,14 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
 
 def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
 
-    #x0 is the inital state of the quadrotor
+    #x0 is the inital state of the quadrotor (16 states for integral control)
     x0 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
 
     #Transforming the desired (target) point into a 4x1 vector
     desired_coord = np.array(desired_coord).reshape(-1, 1)  
     
-    #Initial feasible control vk (the first valid point along the line from A to B), this serves as the starting point
+    #Initial feasible control vk (a 4x1 vector)
+    #(the first valid point along the line from A to B), this serves as the starting point
     vk = 0.01 * desired_coord  
 
     #ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
@@ -767,7 +768,8 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
     N = len(time_interval)
 
     #S is a constraint matrix that uses the feedback matrices K and Kc. S @ x needs to be less than the constraints
-    S = np.block([[-K, Kc], [K, -Kc]])
+    S = np.block([[-K, Kc], 
+                  [K, -Kc]])
 
     #Defining the blocks for integral control, we need to use discrete versions of A_cl and B_cl
     #so we obtain Ad and Bd
@@ -790,7 +792,7 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
     Ad = sysd.A
     Bd = sysd.B
 
-    def predict_future_state(Ad, xt, B, vk, ell):
+    def predict_future_state(Ad, xt, Bd, vk, ell):
         """
         Predicts the future state xhat at time step ell based on the current state xt, input v, 
         and matrices Ad and B.
@@ -798,7 +800,7 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
         Args:
             Ad (numpy.ndarray): The discrete-time system matrix.
             xt (numpy.ndarray): The current state vector.
-            B (numpy.ndarray): The input matrix.
+            Bd (numpy.ndarray): The input matrix.
             v (numpy.ndarray): The control input vector.
             ell (int): The number of time steps ahead to predict.
 
@@ -806,18 +808,18 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
             numpy.ndarray: The predicted future state xhat.
         """
 
-        # Calculate A_d^ℓ
+        #Calculate A_d^ℓ
         Ad_ell = np.linalg.matrix_power(Ad, ell)
 
-        # Calculate (I - A_d)^(-1)
+        #Calculate (I - A_d)^(-1)
         I = np.eye(Ad.shape[0])
         Ad_inv_term = np.linalg.inv(I - Ad)
 
-        # Calculate (I - A_d^ℓ)
+        #Calculate (I - A_d^ℓ)
         I_minus_Ad_ell = I - Ad_ell
 
-        # Calculate the future state
-        xhat = Ad_ell @ xt + (Ad_inv_term @ I_minus_Ad_ell @ B @ vk).reshape(16)
+        #Calculate the future state
+        xhat = (Ad_ell @ xt) + (Ad_inv_term @ I_minus_Ad_ell @ Bd @ vk).reshape(16)
 
         return xhat
 
@@ -826,7 +828,7 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
         """Construct the Hx contraint matrix Hx
 
         Args:
-            S (matrix): A constraint matrix of K and Kc
+            S (matrix): A constraint block matrix of K and Kc
             Ad (matrix): Discrete A control matrix
             x (vector): Future update of state using "predict_future_state()" function
             ell_star (int): number of iterations (timesteps)
@@ -837,10 +839,12 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
 
         Hx = []
 
+        #First element is Sx
         Hx.append(S @ x)
 
         for ell in range(ell_star + 1):
 
+            #Get future state
             x = predict_future_state(Ad, x, Bd, vk, ell)
 
             Ax = np.linalg.matrix_power(Ad, ell) @ x
@@ -849,30 +853,37 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
 
         return np.vstack(Hx)
 
-
     #This function constructs the constraint matrix Hv
     def construct_Hv(S, Ad, Bd, ell_star, state):
-        # Convert A to a diagonal matrix
-        A_diag = np.diag(state)
+        """Construct the Hv constraint matrix
 
-        #Identity matrix of the same size as A_diag
-        I = np.eye(A_diag.shape[0])
+        Args:
+            S (matrix): A constraint block matrix of K and Kc
+            Ad (matrix): Discrete A control matrix
+            x (vector): Future update of state using "predict_future_state()" function
+            ell_star (int): number of iterations (timesteps)
+            Bd (matrix): Discrete B control matrix
+            state (_type_): _description_
 
-        #Compute (I - A) and (I - A^ell_star)
-        I_minus_A = I - A_diag
-        I_minus_A_ell_star = np.linalg.matrix_power(I_minus_A, ell_star)
-
-        #Compute the inverse of (I - A)
-        I_minus_A_inv = np.linalg.inv(I_minus_A)
-
-        #Compute the entire expression
-        result = S @ I_minus_A_inv @ I_minus_A_ell_star @ Bd
-
+        Returns:
+            _type_: _description_
+        """
+        #First element is 0
         Hv = [np.zeros((S.shape[0], Bd.shape[1]))]  
 
-        for elll in range(1, ell_star + 1):
-
+        for ell in range(1, ell_star + 1):
             Hv.append(S @ Bd)  
+
+        #Calculate A_d^ℓ
+        Ad_ell = np.linalg.matrix_power(Ad, ell)
+
+        I = np.eye(Ad.shape[0])
+        Ad_inv_term = np.linalg.inv(I - Ad)
+
+        I_minus_Ad_ell = I - Ad_ell
+
+        #Compute the entire expression
+        result = S @ Ad_inv_term @ I_minus_Ad_ell @ Bd
 
         #Last element
         Hv.append(result)
@@ -904,7 +915,7 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
     def qds_dt(x, u, Ad, Bd):
         return Ad @ x + Bd @ u
 
-    # Reference governor computation
+    #Reference governor computation
     def rg(Hx, Hv, h, desired_coord, vk, state, j):
         """The scalar reference governor returns a scalar values (one) representing the maximum feasible step
            toward the desired coordinates.
@@ -922,11 +933,19 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1,1,1,0]):
             _type_: _description_
         """
         #Bj always > 0 since v_t-1 is always feasible
-        Bj = h[j] - (Hx[j] @ state) - (Hv[j].T @ vk)  
+        Bj = h[j] - (Hx[j] @ state) - (Hv[j] @ vk)  
 
-        Aj = Hv[j].T @ (desired_coord - vk)           
-        
-        kappa = Bj / Aj  
+        Aj = Hv[j].T @ (desired_coord - vk)    
+
+        if Aj < 0:
+            kappa = 1
+            
+        else:       
+            kappa = Bj / Aj  
+
+            #If kappa infeasible
+            if kappa < 0 or kappa > 1:
+                kappa = 0
 
         return kappa
 
