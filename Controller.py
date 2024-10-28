@@ -794,7 +794,7 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
     plt.show()
 
 
-def SRG_Simulation(time_steps=0.01, desired_coord=[1, 1, 1, 0]):
+def SRG_Simulation(time_steps=0.01, desired_coord=[100, 1, 1, 0]):
 
     #x0 is the inital state of the quadrotor (16 states for integral control)
     x0 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
@@ -956,11 +956,6 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1, 1, 1, 0]):
     xx = np.zeros((16, N))
     xx[:, 0] = x0.flatten()
 
-    # The discrete control function, have to use discrete versions Ad and Bd of matrices A and B
-
-    def qds_dt(x, u, Ad, Bd):
-        return Ad @ x + Bd @ u
-
     #Reference governor computation
     def rg(Hx, Hv, h, desired_coord, vk, state, j):
         """The scalar reference governor returns a scalar values (one) representing the maximum feasible step
@@ -970,59 +965,79 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1, 1, 1, 0]):
             Hx (matrix): A constraint matrix
             Hv (matrix): A constraint matrix
             h (matrix): A constraint matrix
-            desired_coord (vector): _description_
-            vk (_type_): _description_
-            state (_type_): _description_
-            j (_type_): _description_
+            desired_coord (vector): The desired coordinates for the quadrotor
+            vk (vector): The control
+            state (vector): The current state
+            j (int): An index for the simulation loop
 
         Returns:
-            _type_: _description_
+            float: A kappa value
         """
         kappa_list = []
 
-        #Bj always > 0 since v_t-1 is always feasible
+        #Computing K*_j for each constraint inequality
         for i in range(h[j].shape[0]):
 
             Bj = h[j][i] - (Hx[j] @ state) - (Hv[j] @ vk)  
 
             Aj = Hv[j].T @ (desired_coord - vk)    
 
-            if Aj < 0:
+            #If Aj <= 0, we set kappa-star to 1 (t's feasible)
+            if Aj <= 0:
                 kappa = 1
                 kappa_list.append(kappa)
                 
-            else:       
+            else:   
+
                 kappa = Bj / Aj  
 
-                #If kappa infeasible
+                #If kappa infeasible, we set it to 0
                 if kappa < 0 or kappa > 1:
                     kappa = 0
 
                 kappa_list.append(kappa)
         
-        #Min kappa is optimal solution
+        #Min kappa-star out of the 8 inequalities is optimal solution
         return min(kappa_list)
+    
+    #The discrete control function, have to use discrete versions Ad and Bd of matrices A and B
+    def qds_dt(x, u, Ad, Bd):
+        """Defines the change in state for the first 12 (non-integral)
+
+        Args:
+            x (vector): The current state
+            u (vector): The current control
+            Ad (matrix): Discrete A control matrix
+            Bd (matrix): Discrete B control matrix
+
+        Returns:
+            vector: The change in the state
+        """
+
+        return Ad @ x + Bd @ u
 
     # Main simulation loop
+    ts1 = 0.1
     for i in range(1, N):
 
         t = (i - 1) * time_steps
 
-        if (t % time_steps) < time_steps:
+        if (t % ts1) < time_steps:
 
-            # Getting kappa from reference governor
-            kappa = rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1)
+            #Getting kappa_t solution from reference governor
+            #We select the minimum feasible kappa-star as the solution
+            kappa = min(rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1), 1)
 
             # Updating vk
             vk = vk + kappa * (desired_coord - vk)
 
-        # Getting integral control u
+        #Getting integral control u to pass into qds_dt()
         u = -K @ xx[:12, i-1] + Kc @ xx[12:16, i-1]
 
-        # Updating integral states with control and error
+        #Updating integral states with control and error
         xx[12:16, i] = xx[12:16, i-1] + (vk.reshape(1, 4) - np.array([xx[1, i-1], xx[3, i-1],xx[5, i-1], xx[11, i-1]])) * time_steps
 
-        # Updating initial 12 states with control and Euler
+        #Updating initial 12 states with control and Euler
         xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:, i-1], u, Ad, Bd)[:12] * time_steps
 
     # Plotting results
