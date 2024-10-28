@@ -749,8 +749,7 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
 
     # Plotting
     fig = plt.figure(figsize=(18, 12))
-    fig.suptitle(f"Quadrotor Figure-8 Path\nWith Amplitude X: {At}, Amplitude Y: {
-                 Bt}, and Angular Velocity {omega}", fontsize=14)
+    fig.suptitle(f"Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {Bt}, and Angular Velocity {omega}", fontsize=14)
 
     # Create 2x2 subplots
     axs = fig.add_subplot(2, 2, 1)
@@ -889,18 +888,16 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1, 1, 1, 0]):
         Hx = []
 
         #First element is Sx
-        Hx.append(S @ x)
+        Hx.append(S)
 
         for ell in range(ell_star + 1):
 
-            #Get future state
-            x = predict_future_state(Ad, x, Bd, vk, ell)
-
-            Ax = np.linalg.matrix_power(Ad, ell) @ x
+            Ax = np.linalg.matrix_power(Ad, ell) 
 
             Hx.append(S @ Ax)
 
         return np.vstack(Hx)
+
 
     #This function constructs the constraint matrix Hv
     def construct_Hv(S, Ad, Bd, ell_star, state):
@@ -981,22 +978,30 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1, 1, 1, 0]):
         Returns:
             _type_: _description_
         """
+        kappa_list = []
+
         #Bj always > 0 since v_t-1 is always feasible
-        Bj = h[j] - (Hx[j] @ state) - (Hv[j] @ vk)  
+        for i in range(h[j].shape[0]):
 
-        Aj = Hv[j].T @ (desired_coord - vk)    
+            Bj = h[j][i] - (Hx[j] @ state) - (Hv[j] @ vk)  
 
-        if Aj < 0:
-            kappa = 1
-            
-        else:       
-            kappa = Bj / Aj  
+            Aj = Hv[j].T @ (desired_coord - vk)    
 
-            #If kappa infeasible
-            if kappa < 0 or kappa > 1:
-                kappa = 0
+            if Aj < 0:
+                kappa = 1
+                kappa_list.append(kappa)
+                
+            else:       
+                kappa = Bj / Aj  
 
-        return kappa
+                #If kappa infeasible
+                if kappa < 0 or kappa > 1:
+                    kappa = 0
+
+                kappa_list.append(kappa)
+        
+        #Min kappa is optimal solution
+        return min(kappa_list)
 
     # Main simulation loop
     for i in range(1, N):
@@ -1015,13 +1020,10 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[1, 1, 1, 0]):
         u = -K @ xx[:12, i-1] + Kc @ xx[12:16, i-1]
 
         # Updating integral states with control and error
-        xx[12:16, i] = xx[12:16, i-1] + \
-            (vk - np.array([xx[1, i-1], xx[3, i-1],
-             xx[5, i-1], xx[11, i-1]])) * time_steps
+        xx[12:16, i] = xx[12:16, i-1] + (vk.reshape(1, 4) - np.array([xx[1, i-1], xx[3, i-1],xx[5, i-1], xx[11, i-1]])) * time_steps
 
         # Updating initial 12 states with control and Euler
-        xx[:12, i] = xx[:12, i-1] + \
-            qds_dt(xx[:12, i-1], u, Ad, Bd) * time_steps
+        xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:, i-1], u, Ad, Bd)[:12] * time_steps
 
     # Plotting results
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
@@ -1074,7 +1076,7 @@ if __name__ == '__main__':
 
     # Run simulation
     # simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
-    # simulate_linear_integral_with_euler(target_state=target_state_integral)
+    #simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
     # simulate_quadrotor_nonlinear_controller(target_state)
@@ -1085,7 +1087,7 @@ if __name__ == '__main__':
     # simulate_quadrotor_linear_controller(target_state, bounds=(0.4, 0))
 
     # clear_bound_values()
-    # SRG_Simulation()
+    SRG_Simulation()
     # simulate_figure_8()
     # simulate_quadrotor_nonlinear_controller(target_state=target_state)
     # print(f'Max force before bound: {np.max(force_before_bound)}')
