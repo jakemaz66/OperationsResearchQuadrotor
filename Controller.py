@@ -794,7 +794,7 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
     plt.show()
 
 
-def SRG_Simulation(time_steps=0.01, desired_coord=[100, 1, 1, 0]):
+def SRG_Simulation(time_steps=0.0001, desired_coord=[1, 1, 1, 0]):
 
     #x0 is the inital state of the quadrotor (16 states for integral control)
     x0 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
@@ -807,7 +807,7 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[100, 1, 1, 0]):
     vk = 0.01 * desired_coord  
 
     # ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
-    ell_star = 1000
+    ell_star = 100000
 
     # Time interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
@@ -1001,12 +1001,12 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[100, 1, 1, 0]):
         return min(kappa_list)
     
     #The discrete control function, have to use discrete versions Ad and Bd of matrices A and B
-    def qds_dt(x, u, Ad, Bd):
+    def qds_dt(x, uc, Ad, Bd):
         """Defines the change in state for the first 12 (non-integral)
 
         Args:
             x (vector): The current state
-            u (vector): The current control
+            u (vector): The current error
             Ad (matrix): Discrete A control matrix
             Bd (matrix): Discrete B control matrix
 
@@ -1014,10 +1014,10 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[100, 1, 1, 0]):
             vector: The change in the state
         """
 
-        return Ad @ x + Bd @ u
+        return (Ad @ x + (Bd @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
 
     # Main simulation loop
-    ts1 = 0.1
+    ts1 = 0.2
     for i in range(1, N):
 
         t = (i - 1) * time_steps
@@ -1031,14 +1031,12 @@ def SRG_Simulation(time_steps=0.01, desired_coord=[100, 1, 1, 0]):
             # Updating vk
             vk = vk + kappa * (desired_coord - vk)
 
-        #Getting integral control u to pass into qds_dt()
-        u = -K @ xx[:12, i-1] + Kc @ xx[12:16, i-1]
-
-        #Updating integral states with control and error
-        xx[12:16, i] = xx[12:16, i-1] + (vk.reshape(1, 4) - np.array([xx[1, i-1], xx[3, i-1],xx[5, i-1], xx[11, i-1]])) * time_steps
+        #Integral control
+        error = (vk.reshape(1, 4) - xx[[1, 3, 5, 11], i-1]) 
 
         #Updating initial 12 states with control and Euler
-        xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:, i-1], u, Ad, Bd)[:12] * time_steps
+        x0 = np.array(qds_dt(xx[:, i-1], error, Acl, Bcl)) * time_steps + x0
+        xx[:, i] = x0
 
     # Plotting results
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
@@ -1090,7 +1088,7 @@ if __name__ == '__main__':
     # if no bounds are passed default will be unbounded (bounds = 0)
 
     # Run simulation
-    # simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
+    #simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
     #simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
