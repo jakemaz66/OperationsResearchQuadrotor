@@ -129,3 +129,40 @@
 #     dxc = xc + error.T[0]
 #     #Return concatenated result return 
 #     return np.concatenate((Dotx, dxc))
+
+
+
+
+
+
+
+# def predict_future_state(Ad, xt, Bd, vk, ell):
+#         """
+#         Predicts the future state xhat at time step ell based on the current state xt, input v, 
+#         and matrices Ad and B.
+
+#         Args:
+#             Ad (numpy.ndarray): The discrete-time system matrix.
+#             xt (numpy.ndarray): The current state vector.
+#             Bd (numpy.ndarray): The input matrix.
+#             v (numpy.ndarray): The control input vector.
+#             ell (int): The number of time steps ahead to predict.
+
+#         Returns:
+#             numpy.ndarray: The predicted future state xhat.
+#         """
+
+#         #Calculate A_d^ℓ
+#         Ad_ell = np.linalg.matrix_power(Ad, ell)
+
+#         #Calculate (I - A_d)^(-1)
+#         I = np.eye(Ad.shape[0])
+#         Ad_inv_term = np.linalg.inv(I - Ad)
+
+#         #Calculate (I - A_d^ℓ)
+#         I_minus_Ad_ell = I - Ad_ell
+
+#         #Calculate the future state
+#         xhat = (Ad_ell @ xt) + (Ad_inv_term @ I_minus_Ad_ell @ Bd @ vk).reshape(16)
+
+#         return xhat

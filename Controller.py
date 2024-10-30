@@ -794,7 +794,7 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
     plt.show()
 
 
-def SRG_Simulation(time_steps=0.0001, desired_coord=[0, 0, 10, 0]):
+def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
 
     #x0 is the inital state of the quadrotor (16 states for integral control)
     x0 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
@@ -839,37 +839,6 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[0, 0, 10, 0]):
     # The final discrete matrices to use in the closed-loop system
     Ad = sysd.A
     Bd = sysd.B
-
-    def predict_future_state(Ad, xt, Bd, vk, ell):
-        """
-        Predicts the future state xhat at time step ell based on the current state xt, input v, 
-        and matrices Ad and B.
-
-        Args:
-            Ad (numpy.ndarray): The discrete-time system matrix.
-            xt (numpy.ndarray): The current state vector.
-            Bd (numpy.ndarray): The input matrix.
-            v (numpy.ndarray): The control input vector.
-            ell (int): The number of time steps ahead to predict.
-
-        Returns:
-            numpy.ndarray: The predicted future state xhat.
-        """
-
-        #Calculate A_d^ℓ
-        Ad_ell = np.linalg.matrix_power(Ad, ell)
-
-        #Calculate (I - A_d)^(-1)
-        I = np.eye(Ad.shape[0])
-        Ad_inv_term = np.linalg.inv(I - Ad)
-
-        #Calculate (I - A_d^ℓ)
-        I_minus_Ad_ell = I - Ad_ell
-
-        #Calculate the future state
-        xhat = (Ad_ell @ xt) + (Ad_inv_term @ I_minus_Ad_ell @ Bd @ vk).reshape(16)
-
-        return xhat
 
     # This function constructs the constraint matrix Hx
     def construct_Hx(S, Ad, x, ell_star, vk, Bd):
@@ -916,23 +885,23 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[0, 0, 10, 0]):
         """
         #First element is 0
         Hv = [np.zeros((S.shape[0], Bd.shape[1]))]  
+        Hv.append(S @ Bd) 
 
         for ell in range(1, ell_star + 1):
-            Hv.append(S @ Bd)  
 
-        #Calculate A_d^ℓ
-        Ad_ell = np.linalg.matrix_power(Ad, ell)
+            #Calculate A_d^ℓ
+            Ad_ell = np.linalg.matrix_power(Ad, ell)
 
-        I = np.eye(Ad.shape[0])
-        Ad_inv_term = np.linalg.inv(I - Ad)
+            I = np.eye(Ad.shape[0])
+            Ad_inv_term = np.linalg.inv(I - Ad)
 
-        I_minus_Ad_ell = I - Ad_ell
+            I_minus_Ad_ell = I - Ad_ell
 
-        #Compute the entire expression
-        result = S @ Ad_inv_term @ I_minus_Ad_ell @ Bd
+            #Compute the entire expression
+            result = S @ Ad_inv_term @ I_minus_Ad_ell @ Bd
 
-        # Last element
-        Hv.append(result)
+            # Last element
+            Hv.append(result)
 
         return np.vstack(Hv)
 
@@ -1001,20 +970,20 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[0, 0, 10, 0]):
         return min(kappa_list)
     
     #The discrete control function, have to use discrete versions Ad and Bd of matrices A and B
-    def qds_dt(x, uc, Ad, Bd):
+    def qds_dt(x, uc, Acl, Bcl):
         """Defines the change in state for the first 12 (non-integral)
 
         Args:
             x (vector): The current state
             u (vector): The current error
-            Ad (matrix): Discrete A control matrix
-            Bd (matrix): Discrete B control matrix
+            Acl (matrix): A control matrix
+            Bcl (matrix): B control matrix
 
         Returns:
             vector: The change in the state
         """
 
-        return (Ad @ x + (Bd @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
+        return (Acl @ x + (Bcl @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
     
 
     #Main simulation loop
@@ -1029,35 +998,35 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[0, 0, 10, 0]):
             #We select the minimum feasible kappa-star as the solution
             kappa = min(rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1), 1)
 
-            # Updating vk
+            #Updating vk
             vk = vk + kappa * (desired_coord - vk)
 
         #Integral control
-        error = (vk.reshape(1, 4) - xx[[1, 3, 5, 11], i-1]) 
+        u = -K @ xx[:12, i - 1] + Kc @ xx[12:16, i - 1]
 
-        #Updating initial 12 states with control and 
-        #Could be: x0 = np.array(predict_future_state(Ad, x0, Bd, vk, i)) * time_steps + x0
-        x0 = np.array(qds_dt(xx[:, i-1], error, Acl, Bcl)) * time_steps + x0
-        xx[:, i] = x0
+        xx[12:, i] = xx[12:, i-1] + (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
 
+        xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
+
+       
     # Plotting results
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
     fig.suptitle("Reference Governor Simulation with Integral Control")
 
     # Change in X over time
-    axs[0, 0].plot(time_interval, xx[0, :], label='X Change')
+    axs[0, 0].plot(time_interval, xx[1, :], label='X Change')
     axs[0, 0].set_title('Change in X')
     axs[0, 0].set_xlabel('Time')
     axs[0, 0].set_ylabel('X Position')
 
     # Change in Y over time
-    axs[0, 1].plot(time_interval, xx[2, :], label='Y Change', color='orange')
+    axs[0, 1].plot(time_interval, xx[3, :], label='Y Change', color='orange')
     axs[0, 1].set_title('Change in Y')
     axs[0, 1].set_xlabel('Time')
     axs[0, 1].set_ylabel('Y Position')
 
     # Change in Z over time
-    axs[1, 0].plot(time_interval, xx[4, :], label='Z Change', color='green')
+    axs[1, 0].plot(time_interval, xx[5, :], label='Z Change', color='green')
     axs[1, 0].set_title('Change in Z')
     axs[1, 0].set_xlabel('Time')
     axs[1, 0].set_ylabel('Z Position')
@@ -1078,9 +1047,9 @@ if __name__ == '__main__':
         0, 0]     # angular velocity and position psi ]
 
     target_state_integral = [
-        0, 3,   # velocity and position on x
-        0, 3,    # velocity and position on y
-        0, 3,    # velocity and position on z
+        0, 0,   # velocity and position on x
+        0, 0,    # velocity and position on y
+        0, 5,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0,     # angular velocity and position psi ]
