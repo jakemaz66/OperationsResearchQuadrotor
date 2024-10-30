@@ -951,19 +951,17 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
 
             Aj = Hv[j].T @ (desired_coord - vk)    
 
-            #If Aj <= 0, we set kappa-star to 1 (t's feasible)
-            if Aj <= 0:
+            #If Aj <= 0, we set kappa-star to 0
+            if Aj <= 0 and Aj >= -1:
                 kappa = 1
                 kappa_list.append(kappa)
-                
+
+            elif Aj <= -1:
+                kappa = 0
+                kappa_list.append(kappa)
+        
             else:   
-
-                kappa = Bj / Aj  
-
-                #If kappa infeasible, we set it to 0
-                if kappa < 0 or kappa > 1:
-                    kappa = 0
-
+                kappa = Bj / Aj 
                 kappa_list.append(kappa)
         
         #Min kappa-star out of the 8 inequalities is optimal solution
@@ -987,12 +985,12 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
     
 
     #Main simulation loop
-    ts1 = 0.2
+    ts1 = 0.1
     for i in range(1, N):
 
         t = (i - 1) * time_steps
 
-        if (t % ts1) < time_steps:
+        if (t % ts1) < time_steps and i != 1:
 
             #Getting kappa_t solution from reference governor
             #We select the minimum feasible kappa-star as the solution
@@ -1008,7 +1006,6 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
 
         xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
 
-       
     # Plotting results
     fig, axs = plt.subplots(2, 2, figsize=(10, 8))
     fig.suptitle("Reference Governor Simulation with Integral Control")
