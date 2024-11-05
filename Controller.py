@@ -794,33 +794,76 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
     plt.show()
 
 
-def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
+def plot_SRG_simulation(time_interval, xx):
+    """Plots the results of the SRG simulation
 
-    #x0 is the inital state of the quadrotor (16 states for integral control)
-    x0 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
+    Args:
+        time_interval (Vector): A vector of time steps
+        xx (Matrix): The stacked matrix containing states at each time step from Euler simulation
+    """
+
+    # Plotting results
+    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+    fig.suptitle("Reference Governor Simulation with Integral Control")
+
+    # Change in X over time
+    axs[0, 0].plot(time_interval, xx[1, :], label='X Change')
+    axs[0, 0].set_title('Change in X')
+    axs[0, 0].set_xlabel('Time')
+    axs[0, 0].set_ylabel('X Position')
+
+    # Change in Y over time
+    axs[0, 1].plot(time_interval, xx[3, :], label='Y Change', color='orange')
+    axs[0, 1].set_title('Change in Y')
+    axs[0, 1].set_xlabel('Time')
+    axs[0, 1].set_ylabel('Y Position')
+
+    # Change in Z over time
+    axs[1, 0].plot(time_interval, xx[5, :], label='Z Change', color='green')
+    axs[1, 0].set_title('Change in Z')
+    axs[1, 0].set_xlabel('Time')
+    axs[1, 0].set_ylabel('Z Position')
+
+    plt.tight_layout()
+    plt.show()
+
+
+def SRG_Simulation(desired_state, time_steps=0.0001, 
+                    initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
+    """The state-reference governor simulation
+
+    Args:
+        desired_state (vector): The target state
+        time_steps (float, optional): The time steps. Defaults to 0.0001.
+        initial_state (vector, optional): The initial state. Defaults to np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).
+
+    Returns:
+        Matrix: The state-matrix of the Euler simulation
+    """
+    x0 = initial_state
 
     #Transforming the desired (target) point into a 4x1 vector
-    desired_coord = np.array(desired_coord).reshape(-1, 1)  
+    desired_coord = np.array(desired_state[[1, 3, 5, 11]]).reshape(-1, 1)  
     
     #Initial feasible control vk (a 4x1 vector)
     #(the first valid point along the line from A to B), this serves as the starting point
     vk = 0.01 * desired_coord  
 
-    # ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
+    #ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
     ell_star = 100000
 
-    # Time interval for the continuous-time system
+    # ime interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
 
-    # Number of time steps for Euler’s method loop
+    #Number of time steps for Euler’s method loop
     N = len(time_interval)
 
     #S is a constraint matrix that uses the feedback matrices K and Kc. S @ x needs to be less than the constraints
     S = np.block([[-K, Kc], 
                   [K, -Kc]])
 
-    # Defining the blocks for integral control, we need to use discrete versions of A_cl and B_cl
-    # so we obtain Ad and Bd
+    #Defining the blocks for integral control, we need to use discrete versions of A_cl and B_cl
+    #so we obtain Ad and Bd to use in governor 
     Ac = np.zeros((4, 4))
     Bc = np.eye(4)
 
@@ -836,18 +879,18 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
     sys = ctrl.ss(Acl, Bcl, Ccl, Dcl)
     sysd = ctrl.c2d(sys, time_steps)
 
-    # The final discrete matrices to use in the closed-loop system
+    #The final discrete matrices to use in the closed-loop system
     Ad = sysd.A
     Bd = sysd.B
 
-    # This function constructs the constraint matrix Hx
-    def construct_Hx(S, Ad, x, ell_star, vk, Bd):
+
+    #This function constructs the constraint matrix Hx (which places constraints on states)
+    def construct_Hx(S, Ad, ell_star):
         """Construct the Hx contraint matrix Hx
 
         Args:
             S (matrix): A constraint block matrix of K and Kc
             Ad (matrix): Discrete A control matrix
-            x (vector): Future update of state using "predict_future_state()" function
             ell_star (int): number of iterations (timesteps)
 
         Returns:
@@ -859,6 +902,7 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
         #First element is Sx
         Hx.append(S)
 
+        #For every time step, construct new constraints on the state
         for ell in range(ell_star + 1):
 
             Ax = np.linalg.matrix_power(Ad, ell) 
@@ -868,8 +912,8 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
         return np.vstack(Hx)
 
 
-    #This function constructs the constraint matrix Hv
-    def construct_Hv(S, Ad, Bd, ell_star, state):
+    #This function constructs the constraint matrix Hv (constraints on control values)
+    def construct_Hv(S, Ad, Bd, ell_star):
         """Construct the Hv constraint matrix
 
         Args:
@@ -878,15 +922,15 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
             x (vector): Future update of state using "predict_future_state()" function
             ell_star (int): number of iterations (timesteps)
             Bd (matrix): Discrete B control matrix
-            state (_type_): _description_
 
         Returns:
-            _type_: _description_
+            matrix: The constraint matrix Hv
         """
         #First element is 0
         Hv = [np.zeros((S.shape[0], Bd.shape[1]))]  
         Hv.append(S @ Bd) 
 
+        #For every time step, construct new constraints on the control
         for ell in range(1, ell_star + 1):
 
             #Calculate A_d^ℓ
@@ -900,30 +944,32 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
             #Compute the entire expression
             result = S @ Ad_inv_term @ I_minus_Ad_ell @ Bd
 
-            # Last element
             Hv.append(result)
 
         return np.vstack(Hv)
 
-    # This function constructs h
+
+    #This function constructs h 
     def construct_h(s, epsilon, ell_star):
 
         h = [s] * ell_star
 
-        # Last element is s - epsilon
+        #Last element is s - epsilon (epsilon is small positive number)
         h.append(s - epsilon)
 
         return np.array(h)
 
-    # Constructing contraint matrices and constraint vector s
+
+    #Constructing contraint matrices and constraint vector s
     Hx = construct_Hx(S, Ad, x0, ell_star, vk, Bd)
     Hv = construct_Hv(S, Ad, Bd, ell_star, x0)
     s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005]).T
     h = construct_h(s, 0.005, ell_star)
 
-    # Initialize x array (evolving state over time)
+    #Initialize x array (evolving state over time)
     xx = np.zeros((16, N))
     xx[:, 0] = x0.flatten()
+
 
     #Reference governor computation
     def rg(Hx, Hv, h, desired_coord, vk, state, j):
@@ -952,22 +998,20 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
             Aj = Hv[j].T @ (desired_coord - vk)    
 
             #If Aj <= 0, we set kappa-star to 0
-            if Aj <= 0 and Aj >= -1:
+            if Aj <= 0:
                 kappa = 1
-                kappa_list.append(kappa)
-
-            elif Aj <= -1:
-                kappa = 0
                 kappa_list.append(kappa)
         
             else:   
+
                 kappa = Bj / Aj 
                 kappa_list.append(kappa)
         
         #Min kappa-star out of the 8 inequalities is optimal solution
         return min(kappa_list)
     
-    #The discrete control function, have to use discrete versions Ad and Bd of matrices A and B
+
+    #The control function for Euler simulation
     def qds_dt(x, uc, Acl, Bcl):
         """Defines the change in state for the first 12 (non-integral)
 
@@ -981,11 +1025,14 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
             vector: The change in the state
         """
 
+        #Integral control
         return (Acl @ x + (Bcl @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
     
+    #Main simulation loop for SRG Euler simulation
 
-    #Main simulation loop
-    ts1 = 0.1
+    #Sampling time for reference governor (ts1 > time_steps)
+    ts1 = 0.001
+
     for i in range(1, N):
 
         t = (i - 1) * time_steps
@@ -1006,32 +1053,10 @@ def SRG_Simulation(time_steps=0.0001, desired_coord=[5, 5, 5, 0]):
 
         xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
 
-    # Plotting results
-    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
-    fig.suptitle("Reference Governor Simulation with Integral Control")
 
-    # Change in X over time
-    axs[0, 0].plot(time_interval, xx[1, :], label='X Change')
-    axs[0, 0].set_title('Change in X')
-    axs[0, 0].set_xlabel('Time')
-    axs[0, 0].set_ylabel('X Position')
+    return xx
 
-    # Change in Y over time
-    axs[0, 1].plot(time_interval, xx[3, :], label='Y Change', color='orange')
-    axs[0, 1].set_title('Change in Y')
-    axs[0, 1].set_xlabel('Time')
-    axs[0, 1].set_ylabel('Y Position')
-
-    # Change in Z over time
-    axs[1, 0].plot(time_interval, xx[5, :], label='Z Change', color='green')
-    axs[1, 0].set_title('Change in Z')
-    axs[1, 0].set_xlabel('Time')
-    axs[1, 0].set_ylabel('Z Position')
-
-    plt.tight_layout()
-    plt.show()
-
-
+    
 if __name__ == '__main__':
     print("Main started")
 
