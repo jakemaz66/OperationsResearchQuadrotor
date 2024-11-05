@@ -951,6 +951,16 @@ def SRG_Simulation(desired_state, time_steps=0.0001,
 
     #This function constructs h 
     def construct_h(s, epsilon, ell_star):
+        """Construct the contraint matrix h
+
+        Args:
+            s (vector): The constraint vector
+            epsilon (float): A small positive number
+            ell_star (int): number of iterations (timesteps)
+
+        Returns:
+            matrix: The constraint matrix h
+        """
 
         h = [s] * ell_star
 
@@ -997,7 +1007,7 @@ def SRG_Simulation(desired_state, time_steps=0.0001,
 
             Aj = Hv[j].T @ (desired_coord - vk)    
 
-            #If Aj <= 0, we set kappa-star to 0
+            #If Aj <= 0, we set kappa-star to 1
             if Aj <= 0:
                 kappa = 1
                 kappa_list.append(kappa)
@@ -1093,7 +1103,7 @@ if __name__ == '__main__':
     # simulate_quadrotor_linear_controller(target_state, bounds=(0.4, 0))
 
     # clear_bound_values()
-    SRG_Simulation()
+    SRG_Simulation(desired_state=target_state_integral)
     # simulate_figure_8()
     # simulate_quadrotor_nonlinear_controller(target_state=target_state)
     # print(f'Max force before bound: {np.max(force_before_bound)}')
