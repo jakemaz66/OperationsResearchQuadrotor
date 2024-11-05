@@ -885,6 +885,52 @@ def plot_SRG_simulation(time_interval, xx):
     plt.show()
 
 
+def plot_SRG_controls(time_interval, controls): 
+    """Plots the control variables with constraints for the SRG simulation.
+
+    Args:
+        time_interval (Vector): A vector of time steps.
+        controls (Matrix): A 4xN matrix where each row represents a control variable over time.
+    """
+    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+    fig.suptitle("SRG Control Variables with Constraints")
+
+    # Plot for controls[0]
+    axs[0, 0].plot(time_interval, controls[0, :], label='Control 1')
+    axs[0, 0].axhline(y=6, color='red', linestyle='--', label='Constraint at 6')
+    axs[0, 0].set_title('Control Variable 1')
+    axs[0, 0].set_xlabel('Time')
+    axs[0, 0].set_ylabel('Control 1')
+    axs[0, 0].legend()
+
+    # Plot for controls[1]
+    axs[0, 1].plot(time_interval, controls[1, :], label='Control 2')
+    axs[0, 1].axhline(y=0.005, color='red', linestyle='--', label='Constraint at 0.005')
+    axs[0, 1].set_title('Control Variable 2')
+    axs[0, 1].set_xlabel('Time')
+    axs[0, 1].set_ylabel('Control 2')
+    axs[0, 1].legend()
+
+    # Plot for controls[2]
+    axs[1, 0].plot(time_interval, controls[2, :], label='Control 3')
+    axs[1, 0].axhline(y=0.005, color='red', linestyle='--', label='Constraint at 0.005')
+    axs[1, 0].set_title('Control Variable 3')
+    axs[1, 0].set_xlabel('Time')
+    axs[1, 0].set_ylabel('Control 3')
+    axs[1, 0].legend()
+
+    # Plot for controls[3]
+    axs[1, 1].plot(time_interval, controls[3, :], label='Control 4')
+    axs[1, 1].axhline(y=0.005, color='red', linestyle='--', label='Constraint at 0.005')
+    axs[1, 1].set_title('Control Variable 4')
+    axs[1, 1].set_xlabel('Time')
+    axs[1, 1].set_ylabel('Control 4')
+    axs[1, 1].legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
 def SRG_Simulation(desired_state, time_steps=0.0001,
                    initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
     """The state-reference governor simulation
@@ -1132,7 +1178,7 @@ def SRG_Simulation(desired_state, time_steps=0.0001,
         xx[:12, i] = xx[:12, i-1] + \
             qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
 
-    return xx, controls
+    return xx, controls, time_interval
 
 
 if __name__ == '__main__':
@@ -1149,7 +1195,7 @@ if __name__ == '__main__':
     target_state_integral = [
         0, 0,   # velocity and position on x
         0, 0,    # velocity and position on y
-        0, 5,    # velocity and position on z
+        0, 500000000000,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0,     # angular velocity and position psi ]
@@ -1171,7 +1217,8 @@ if __name__ == '__main__':
     # simulate_quadrotor_linear_controller(target_state, bounds=(0.4, 0))
 
     # clear_bound_values()
-    SRG_Simulation(desired_state=target_state_integral)
+    xx, controls, time_interval = SRG_Simulation(desired_state=target_state_integral)
+    plot_SRG_controls(time_interval, controls)
     # simulate_figure_8()
     # simulate_quadrotor_nonlinear_controller(target_state=target_state)
     # print(f'Max force before bound: {np.max(force_before_bound)}')
