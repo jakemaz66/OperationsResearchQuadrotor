@@ -1105,7 +1105,6 @@ def SRG_Simulation(desired_state, time_steps=0.0001,
 
     # Sampling time for reference governor (ts1 > time_steps)
     ts1 = 0.001
-
     controls = xx = np.zeros((4, N))
 
     for i in range(1, N):
@@ -1132,7 +1131,41 @@ def SRG_Simulation(desired_state, time_steps=0.0001,
         xx[:12, i] = xx[:12, i-1] + \
             qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
 
-    return xx, controls
+    # Plotting results
+    fig = plt.figure(figsize=(12, 8))
+    fig.suptitle("Reference Governor Simulation with Integral Control")
+
+    # Change in X over time
+    ax1 = fig.add_subplot(2, 2, 1)
+    ax1.plot(time_interval, xx[1, :], label='X Change')
+    ax1.set_title('Change in X')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('X Position')
+
+    # Change in Y over time
+    ax2 = fig.add_subplot(2, 2, 2)
+    ax2.plot(time_interval, xx[3, :], label='Y Change', color='orange')
+    ax2.set_title('Change in Y')
+    ax2.set_xlabel('Time')
+    ax2.set_ylabel('Y Position')
+
+    # Change in Z over time
+    ax3 = fig.add_subplot(2, 2, 3)
+    ax3.plot(time_interval, xx[5, :], label='Z Change', color='green')
+    ax3.set_title('Change in Z')
+    ax3.set_xlabel('Time')
+    ax3.set_ylabel('Z Position')
+
+    # 3D plot of X, Y, Z states
+    ax4 = fig.add_subplot(2, 2, 4, projection='3d')
+    ax4.plot(xx[1, :], xx[3, :], xx[5, :], label='3D Trajectory', color='purple')
+    ax4.set_title('3D State Trajectory')
+    ax4.set_xlabel('X Position')
+    ax4.set_ylabel('Y Position')
+    ax4.set_zlabel('Z Position')
+
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -1149,7 +1182,7 @@ if __name__ == '__main__':
     target_state_integral = [
         0, 0,   # velocity and position on x
         0, 0,    # velocity and position on y
-        0, 5,    # velocity and position on z
+        0, 500000000000000000000000000000,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0,     # angular velocity and position psi ]
