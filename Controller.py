@@ -1152,7 +1152,7 @@ def SRG_Simulation(desired_state, time_steps=0.0001,
     # Sampling time for reference governor (ts1 > time_steps)
     ts1 = 0.001
 
-    controls = xx = np.zeros((4, N))
+    controls = np.zeros((4, N))
 
     for i in range(1, N):
 
