@@ -1015,6 +1015,11 @@ def SRG_Simulation(desired_state, time_steps=0.0001,
             else:   
 
                 kappa = Bj / Aj 
+                
+                #If kappa is infeasible
+                if kappa < 0 or kappa > 1:
+                    kappa = 0
+
                 kappa_list.append(kappa)
         
         #Min kappa-star out of the 8 inequalities is optimal solution
