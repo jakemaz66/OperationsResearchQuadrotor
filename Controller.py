@@ -1167,10 +1167,10 @@ def SRG_Simulation(desired_state, time_steps=0.0001,
             # Updating vk
             vk = vk + kappa * (desired_coord - vk)
 
-            controls[:, i] = vk
-
         # Integral control
         u = -K @ xx[:12, i - 1] + Kc @ xx[12:16, i - 1]
+
+        controls[:, i] = u.reshape(1, 4)[0]
 
         xx[12:, i] = xx[12:, i-1] + \
             (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
