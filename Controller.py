@@ -200,61 +200,87 @@ def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
     uc = (target_state[[1, 3, 5, 11]] - curstate_integral[[1, 3, 5, 11]])
 
     Dotx = Ac @ curstate_integral + Bc @ uc
-    
+
     return Dotx, uc
 
 
 def nonlinear_dynamics_integral(t, curstate_integral, target_state):
-    """The dyanmics for nonlinear integral control. We simply use a the integral way to get control -K @ normal_error + Kc @ integral_error
-       and then apply the non-linear calculations.
+    """
+    The dynamics for nonlinear integral control. We use a provided control input
+    instead of calculating it inside this function.
 
     Args:
         t (float): The time
-        curstate_integral (array): The current state of quadrotor
-        target_state (array): The target state of quadrotor
+        curstate_integral (array): The current state of the quadrotor
+        target_state (array): The target state of the quadrotor
+        control (array): The control input computed outside this function
 
     Returns:
         array: The state-change array
     """
-    #Unpack current state
+
+    def calculate_control(curstate_integral):
+        """
+        Calculate the control based on the error and integral components.
+        
+        Args:
+            curstate_integral (array): The current state of the quadrotor
+            target_state (array): The target state of the quadrotor
+            K (array): Proportional gain matrix
+            Kc (array): Integral gain matrix
+
+        Returns:
+            array: The control vector
+        """
+        # Calculate proportional error for primary control
+        normal_control = np.array(curstate_integral[:12])
+        integral_control = np.array(curstate_integral[12:])
+
+        # Calculate control with both proportional and integral components
+        control = -K @ normal_control + Kc @ integral_control
+        
+        # Decompose control outputs for forces and torques
+        control[0] += Mq * g  # Adjust force (throttle) with gravitational force
+
+        return control
+
+    # Unpack current state
     u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = curstate_integral
+
+    error = np.array(curstate_integral)[[1, 3, 5, 11]] - np.array(target_state)[[1, 3, 5, 11]]
+
+    curstate_integral[12:] = error
+
+    #Call control function
+    control = calculate_control(curstate_integral)
     
-    #Calculate error between current state and target state
-    normal_error = curstate_integral[:12] - target_state[:12]  
-    integral_error = np.array(curstate_integral)[[1, 3, 5, 11]] - np.array(target_state)[[1, 3, 5, 11]] 
-
-    #Calculate control with both proportional and integral components
-    control = -K @ normal_error + Kc @ integral_error
-
-    #Decompose control outputs
-    F = control[0] + Mq * g  # Force -> Throttle
-    TauPhi = control[1]      # Roll torque
-    TauTheta = control[2]    # Pitch torque
-    TauPsi = control[3]      # Yaw torque
-
-    #Calculate nonlinear dynamics for linear velocities
+    # Calculate nonlinear dynamics for linear velocities
     uDot = (r * v - q * w) - g * np.sin(theta)
     vDot = (p * w - r * u) + g * np.cos(theta) * np.sin(phi)
-    wDot = (q * u - p * v) + g * np.cos(theta) * np.cos(phi) - F / Mq
+    wDot = (q * u - p * v) + g * np.cos(theta) * np.cos(phi) - control[0] / Mq
 
-    #Calculate nonlinear dynamics for angular velocities
-    pDot = ((Jy - Jz) / Jx) * q * r + (1 / Jx) * TauPhi
-    qDot = ((Jz - Jx) / Jy) * p * r + (1 / Jy) * TauTheta
-    rDot = ((Jx - Jy) / Jz) * p * q + (1 / Jz) * TauPsi
+    # Calculate nonlinear dynamics for angular velocities
+    pDot = ((Jy - Jz) / Jx) * q * r + (1 / Jx) * control[1]
+    qDot = ((Jz - Jx) / Jy) * p * r + (1 / Jy) * control[2]
+    rDot = ((Jx - Jy) / Jz) * p * q + (1 / Jz) * control[3]
 
-    #Position dynamics
+    # Position dynamics
     PxDot = u
     PyDot = v
     PzDot = w
 
-    #Prepare the state derivative vector (to be returned for integration)
+    # Prepare the state derivative vector (to be returned for integration)
     state_dot = [
         uDot, PxDot, vDot, PyDot, wDot, PzDot, 
         pDot, p, qDot, q, rDot, r,
-        integral_error[0], integral_error[1], integral_error[2], integral_error[3]
+        i1, i2, i3, i4
     ]
+
+    state_dot = np.array([float(el) for el in state_dot])
+    control = np.array([float(el) for el in control])
     
     return state_dot, control
+
 
 
 def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -327,7 +353,7 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
     x_tot[:, 0] = initial_state
 
     #For plotting controls to see if constraints violated
-    control_matrix = np.zeros((4, len(total_time_steps)))
+    control_matrix = np.zeros((4, total_time_steps))
 
     # At each time-step, update the position array x_tot with the linear_dynamics
     for j in range(1, total_time_steps):
@@ -336,9 +362,7 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
         control_matrix[:, j] = control
         x_tot[:, j] = x0 
 
-    return x_tot, control
-
-
+    return x_tot, control, time_range
 
 
 def simulate_quadrotor_linear_integral_controller(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span=[0, 10]):
@@ -1437,7 +1461,8 @@ if __name__ == '__main__':
     # if no bounds are passed default will be unbounded (bounds = 0)
 
     # Run simulation
-    simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
+    results, control, time_interval = simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
+    plot_SRG_simulation(time_interval, results)
     # simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
