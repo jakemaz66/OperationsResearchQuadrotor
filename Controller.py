@@ -138,7 +138,8 @@ def linear_dynamics_ivp(t, curstate, A, B, target_state, bounds):
 
 
 def linear_dynamics_ode(current_state, t, K, A, B, target_state):
-    # We must have different functions for ode and ivp even though they perform the same calculation because the order of the arguments is different
+    # We must have different functions for ode and ivp even though they perform the same calculation because the order 
+    # of the arguments is different
 
     error = current_state - target_state
     control = -K @ error
@@ -147,7 +148,8 @@ def linear_dynamics_ode(current_state, t, K, A, B, target_state):
 
 
 def nonlinear_dynamics_ode(current_state, t, K, target_state):
-    # We must have different functions for ode and ivp even though they perform the same calculation because the order of the arguments is different
+    # We must have different functions for ode and ivp even though they perform the same calculation because the order
+    #  of the arguments is different
 
     error = current_state - target_state
     control = -K @ error
@@ -178,6 +180,18 @@ def nonlinear_dynamics_ode(current_state, t, K, target_state):
 
 
 def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
+    """The dynamics for linear integral control (used in Euler simulation)
+
+    Args:
+        t (float): The time
+        curstate_integral (array): The current state of quadrotor
+        Ac (matrix): Control matrix for integral control
+        Bc (matrix): Control matrix for integral control
+        target_state (array): The target state of quadrotor
+
+    Returns:
+        array: The state-change array
+    """
 
     target_state = np.array(target_state)
     curstate_integral = np.array(curstate_integral)
@@ -186,10 +200,22 @@ def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
     uc = (target_state[[1, 3, 5, 11]] - curstate_integral[[1, 3, 5, 11]])
 
     Dotx = Ac @ curstate_integral + Bc @ uc
-    return Dotx
+    
+    return Dotx, uc
 
 
 def nonlinear_dynamics_integral(t, curstate_integral, target_state):
+    """The dyanmics for nonlinear integral control. We simply use a the integral way to get control -K @ normal_error + Kc @ integral_error
+       and then apply the non-linear calculations.
+
+    Args:
+        t (float): The time
+        curstate_integral (array): The current state of quadrotor
+        target_state (array): The target state of quadrotor
+
+    Returns:
+        array: The state-change array
+    """
     #Unpack current state
     u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = curstate_integral
     
@@ -228,12 +254,12 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
         integral_error[0], integral_error[1], integral_error[2], integral_error[3]
     ]
     
-    return state_dot
+    return state_dot, control
 
 
 def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                         total_time=10, time_step=0.00001):
-    """This method simulates flight using the Euler method
+    """This method simulates flight using the Euler method and linear integral control
 
     Args:   
         target_state (array): The target state of quadrotor
@@ -266,51 +292,22 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
     )
     Bcl = np.vstack([np.zeros((12, 4)), Bc])
 
+    control_matrix = np.zeros((4, len(total_time_steps)))
+
     # At each time-step, update the position array x_tot with the linear_dynamics
     for j in range(1, total_time_steps):
-        x0 = linear_dynamics_integral(
-            j, x0, Acl, Bcl, target_state) * time_step + x0
+        state_change, control = linear_dynamics_integral(j, x0, Acl, Bcl, target_state)
+        x0 =  state_change * time_step + x0
+        control_matrix[:, j] = control
         x_tot[:, j] = x0 * 2
 
-    # Create subplots
-    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
-    fig.suptitle("Simulating with Euler and Linear Integral Control")
+    return x_tot, control
 
-    # Change in X over time
-    axs[0, 0].plot(time_range, x_tot[1, :], label='X Change')
-    axs[0, 0].set_title('Change in X')
-    axs[0, 0].set_xlabel('Time')
-    axs[0, 0].set_ylabel('X Position')
-
-    # Change in Y over time
-    axs[0, 1].plot(time_range, x_tot[3, :], label='Y Change', color='orange')
-    axs[0, 1].set_title('Change in Y')
-    axs[0, 1].set_xlabel('Time')
-    axs[0, 1].set_ylabel('Y Position')
-
-    # Change in Z over time
-    axs[1, 0].plot(time_range, x_tot[5, :], label='Z Change', color='green')
-    axs[1, 0].set_title('Change in Z')
-    axs[1, 0].set_xlabel('Time')
-    axs[1, 0].set_ylabel('Z Position')
-
-    # 3D Trajectory Plot
-    ax3d = fig.add_subplot(2, 2, 4, projection='3d')
-    ax3d.plot(x_tot[1, :], x_tot[3, :], x_tot[5, :],
-              label='3D Trajectory', color='red')
-    ax3d.set_title('3D Trajectory')
-    ax3d.set_xlabel('X Position')
-    ax3d.set_ylabel('Y Position')
-    ax3d.set_zlabel('Z Position')
-
-    # Adjust layout for better spacing
-    plt.tight_layout()
-    plt.show()
 
 
 def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                            total_time=10, time_step=0.0001, bounds=(0, 0)):
-    """This method simulates flight using the Euler method
+    """This method simulates flight using the Euler method and nonlinear dynamics with integral control
 
     Args:   
         target_state (array): The target state of quadrotor
@@ -328,49 +325,20 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
 
     # The first time step is equal to the initial state of the quadrotor
     x_tot[:, 0] = initial_state
-    Acl = None
-    Bcl = None
+
+    #For plotting controls to see if constraints violated
+    control_matrix = np.zeros((4, len(total_time_steps)))
 
     # At each time-step, update the position array x_tot with the linear_dynamics
     for j in range(1, total_time_steps):
-        x0 = np.array(nonlinear_dynamics_integral(
-            j, x0, target_state)) * time_step + x0
-        x_tot[:, j] = x0
+        state_change, control = nonlinear_dynamics_integral(j, x0, target_state)
+        x0 =  state_change * time_step + x0
+        control_matrix[:, j] = control
+        x_tot[:, j] = x0 
 
-    # Create subplots
-    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
-    fig.suptitle("Simulating with Euler and Non-linear Integral Control")
+    return x_tot, control
 
-    # Change in X over time
-    axs[0, 0].plot(time_range, x_tot[1, :], label='X Change')
-    axs[0, 0].set_title('Change in X')
-    axs[0, 0].set_xlabel('Time')
-    axs[0, 0].set_ylabel('X Position')
 
-    # Change in Y over time
-    axs[0, 1].plot(time_range, x_tot[3, :], label='Y Change', color='orange')
-    axs[0, 1].set_title('Change in Y')
-    axs[0, 1].set_xlabel('Time')
-    axs[0, 1].set_ylabel('Y Position')
-
-    # Change in Z over time
-    axs[1, 0].plot(time_range, x_tot[5, :], label='Z Change', color='green')
-    axs[1, 0].set_title('Change in Z')
-    axs[1, 0].set_xlabel('Time')
-    axs[1, 0].set_ylabel('Z Position')
-
-    # 3D Trajectory Plot
-    ax3d = fig.add_subplot(2, 2, 4, projection='3d')
-    ax3d.plot(x_tot[1, :], x_tot[3, :], x_tot[5, :],
-              label='3D Trajectory', color='red')
-    ax3d.set_title('3D Trajectory')
-    ax3d.set_xlabel('X Position')
-    ax3d.set_ylabel('Y Position')
-    ax3d.set_zlabel('Z Position')
-
-    # Adjust layout for better spacing
-    plt.tight_layout()
-    plt.show()
 
 
 def simulate_quadrotor_linear_integral_controller(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], time_span=[0, 10]):
@@ -912,7 +880,7 @@ def plot_SRG_controls(time_interval, controls):
 
 def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
                    initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
-    """The state-reference governor simulation
+    """The state-reference governor simulation with linear dynamics
 
     Args:
         desired_state (vector): The target state
@@ -1123,7 +1091,7 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
             vector: The change in the state
         """
 
-        # Integral control
+        # Integral control (linear version)
         return (Acl @ x + (Bcl @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
 
     # Main simulation loop for SRG Euler simulation
@@ -1163,7 +1131,7 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
 
 def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
                    initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
-    """The state-reference governor simulation
+    """The state-reference governor simulation with Nonlinear dynamics
 
     Args:
         desired_state (vector): The target state
@@ -1361,12 +1329,12 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
     # The control function for Euler simulation
 
-    def qds_dt(x, vk):
-        """Defines the change in state for the first 12 (non-integral)
+    def qds_dt_nonlinear(x, vk):
+        """Defines the change in state with non_linear dynamics
 
         Args:
             x (vector): The current state
-            vk (vector): 
+            vk (vector): Feasible set point
 
 
         Returns:
@@ -1436,7 +1404,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
             # Updating vk
             vk = vk + kappa * (desired_coord - vk)
 
-        state_change, controls_t = qds_dt(xx[:, i-1], vk)
+        state_change, controls_t = qds_dt_nonlinear(xx[:, i-1], vk)
         controls[:, i] = controls_t.reshape(1, 4)[0]
 
         xx[:, i] = xx[:, i-1] + state_change * time_steps
@@ -1469,7 +1437,7 @@ if __name__ == '__main__':
     # if no bounds are passed default will be unbounded (bounds = 0)
 
     # Run simulation
-    #simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
+    simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
     # simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
@@ -1482,8 +1450,8 @@ if __name__ == '__main__':
 
     # clear_bound_values()
     #xx, controls, time_interval = SRG_Simulation_Linear(desired_state=target_state_integral)
-    xx, controls, time_interval = SRG_Simulation_Nonlinear(desired_state=target_state_integral)
-    plot_SRG_simulation(time_interval, xx)
+    #xx, controls, time_interval = SRG_Simulation_Nonlinear(desired_state=target_state_integral)
+    #plot_SRG_simulation(time_interval, xx)
     #xx, controls, time_interval = SRG_Simulation_Linear(desired_state=target_state_integral)
     #plot_SRG_controls(time_interval, controls)
     # simulate_figure_8()
