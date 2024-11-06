@@ -189,67 +189,46 @@ def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
     return Dotx
 
 
-def nonlinear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state, bounds):
-
+def nonlinear_dynamics_integral(t, curstate_integral, target_state):
+    #Unpack current state
     u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = curstate_integral
-    force_bound, torque_bound = bounds
+    
+    #Calculate error between current state and target state
+    normal_error = curstate_integral[:12] - target_state[:12]  
+    integral_error = np.array(curstate_integral)[[1, 3, 5, 11]] - np.array(target_state)[[1, 3, 5, 11]] 
 
-    target_state = np.array(target_state)
-    curstate_integral = np.array(curstate_integral)
+    #Calculate control with both proportional and integral components
+    control = -K @ normal_error + Kc @ integral_error
 
-    error = curstate_integral[:12] - target_state[:12]
-    integral_error = curstate_integral[12:] - target_state[12:]
-
-    # Implementing integral control
-    control = -K @ error - Kc @ integral_error
-
+    #Decompose control outputs
     F = control[0] + Mq * g  # Force -> Throttle
-    TauPhi = control[1]     # Roll torque
-    TauTheta = control[2]   # Pitch torque
-    TauPsi = control[3]     # Yaw Torque
+    TauPhi = control[1]      # Roll torque
+    TauTheta = control[2]    # Pitch torque
+    TauPsi = control[3]      # Yaw torque
 
-    force_before_bound.append(F)
-    tauPhi_before_bound.append(TauPhi)
-    tauTheta_before_bound.append(TauTheta)
-    tauPsi_before_bound.append(TauPsi)
+    #Calculate nonlinear dynamics for linear velocities
+    uDot = (r * v - q * w) - g * np.sin(theta)
+    vDot = (p * w - r * u) + g * np.cos(theta) * np.sin(phi)
+    wDot = (q * u - p * v) + g * np.cos(theta) * np.cos(phi) - F / Mq
 
-    # if force_bound:
-    #     F = np.clip(F, None, force_bound)
+    #Calculate nonlinear dynamics for angular velocities
+    pDot = ((Jy - Jz) / Jx) * q * r + (1 / Jx) * TauPhi
+    qDot = ((Jz - Jx) / Jy) * p * r + (1 / Jy) * TauTheta
+    rDot = ((Jx - Jy) / Jz) * p * q + (1 / Jz) * TauPsi
 
-    # if torque_bound:
-    #     TauPhi = np.clip(TauPhi, -torque_bound, torque_bound)
-    #     TauTheta = np.clip(TauTheta, -torque_bound, torque_bound)
-    #     TauPsi = np.clip(TauPsi, -torque_bound, torque_bound)
-
-    force_after_bound.append(F)
-    tauPhi_after_bound.append(TauPhi)
-    tauTheta_after_bound.append(TauTheta)
-    tauPsi_after_bound.append(TauPsi)
-
-    # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
-    uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
-    vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
-    wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / m)
-
-    # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
-    pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
-    qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
-    rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
-
+    #Position dynamics
     PxDot = u
     PyDot = v
     PzDot = w
 
-    # u, Px, v, Py, w, Pz , phi, p, theta, q, psi, r
-    state_change = [uDot, PxDot, vDot, PyDot, wDot,
-                    PzDot, pDot, p, qDot, q, rDot, r, i1, i2, i3, i4]
-
-    state = []
-    for el in state_change:
-        el = float(el)
-        state.append(el)
-
-    return state
+    #Prepare the state derivative vector (to be returned for integration)
+    state_dot = [
+        uDot, PxDot, vDot, PyDot, wDot, PzDot, 
+        pDot, p, qDot, q, rDot, r,
+        integral_error[0], integral_error[1], integral_error[2], integral_error[3]
+    ]
+    
+    return state_dot
 
 
 def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -355,7 +334,7 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
     # At each time-step, update the position array x_tot with the linear_dynamics
     for j in range(1, total_time_steps):
         x0 = np.array(nonlinear_dynamics_integral(
-            j, x0, Acl, Bcl, target_state, bounds)) * time_step + x0
+            j, x0, target_state)) * time_step + x0
         x_tot[:, j] = x0
 
     # Create subplots
@@ -1195,7 +1174,7 @@ if __name__ == '__main__':
     target_state_integral = [
         0, 0,   # velocity and position on x
         0, 0,    # velocity and position on y
-        0, 500000000000,    # velocity and position on z
+        0, 5,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0,     # angular velocity and position psi ]
@@ -1205,7 +1184,7 @@ if __name__ == '__main__':
     # if no bounds are passed default will be unbounded (bounds = 0)
 
     # Run simulation
-    # simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
+    simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
     # simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
