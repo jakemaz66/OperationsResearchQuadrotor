@@ -1365,49 +1365,68 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
             vector: The change in the state
         """
 
-        #Unpack current state
+        def calculate_control(curstate_integral):
+            """
+            Calculate the control based on the error and integral components.
+            
+            Args:
+                curstate_integral (array): The current state of the quadrotor
+                target_state (array): The target state of the quadrotor
+                K (array): Proportional gain matrix
+                Kc (array): Integral gain matrix
+
+            Returns:
+                array: The control vector
+            """
+            # Calculate proportional error for primary control
+            normal_control = np.array(curstate_integral[:12])
+            integral_control = np.array(curstate_integral[12:])
+
+            # Calculate control with both proportional and integral components
+            control = -K @ normal_control + Kc @ integral_control
+            
+            # Decompose control outputs for forces and torques
+            control[0] += Mq * g  # Adjust force (throttle) with gravitational force
+
+            return control
+
+        # Unpack current state
         u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = x
+
+        error = np.array(vk)[[1, 3, 5, 11]] - np.array(target_state)[[1, 3, 5, 11]]
+
+        x[12:] = error
+
+        #Call control function
+        control = calculate_control(x)
         
-        #Calculate error between current state and target state
-        normal_error = x[:12] - target_state[:12]  
-        integral_error = np.array(vk).reshape(1,4)[0] - np.array(target_state)[[1, 3, 5, 11]] 
-
-        #Calculate control with both proportional and integral components
-        control = -K @ normal_error + Kc @ integral_error
-
-        #Decompose control outputs
-        F = control[0] + Mq * g  # Force -> Throttle
-        TauPhi = control[1]      # Roll torque
-        TauTheta = control[2]    # Pitch torque
-        TauPsi = control[3]      # Yaw torque
-
-        #Calculate nonlinear dynamics for linear velocities
+        # Calculate nonlinear dynamics for linear velocities
         uDot = (r * v - q * w) - g * np.sin(theta)
         vDot = (p * w - r * u) + g * np.cos(theta) * np.sin(phi)
-        wDot = (q * u - p * v) + g * np.cos(theta) * np.cos(phi) - F / Mq
+        wDot = (q * u - p * v) + g * np.cos(theta) * np.cos(phi) - control[0] / Mq
 
-        #Calculate nonlinear dynamics for angular velocities
-        pDot = ((Jy - Jz) / Jx) * q * r + (1 / Jx) * TauPhi
-        qDot = ((Jz - Jx) / Jy) * p * r + (1 / Jy) * TauTheta
-        rDot = ((Jx - Jy) / Jz) * p * q + (1 / Jz) * TauPsi
+        # Calculate nonlinear dynamics for angular velocities
+        pDot = ((Jy - Jz) / Jx) * q * r + (1 / Jx) * control[1]
+        qDot = ((Jz - Jx) / Jy) * p * r + (1 / Jy) * control[2]
+        rDot = ((Jx - Jy) / Jz) * p * q + (1 / Jz) * control[3]
 
-        #Position dynamics
+        # Position dynamics
         PxDot = u
         PyDot = v
         PzDot = w
 
-        #Prepare the state derivative vector (to be returned for integration)
+        # Prepare the state derivative vector (to be returned for integration)
         state_dot = [
             uDot, PxDot, vDot, PyDot, wDot, PzDot, 
             pDot, p, qDot, q, rDot, r,
-            integral_error[0], integral_error[1], integral_error[2], integral_error[3]
+            i1, i2, i3, i4
         ]
 
         state_dot = np.array([float(el) for el in state_dot])
+        control = np.array([float(el) for el in control])
         
         return state_dot, control
         
-
     # Main simulation loop for SRG Euler simulation
 
     # Sampling time for reference governor (ts1 > time_steps)
