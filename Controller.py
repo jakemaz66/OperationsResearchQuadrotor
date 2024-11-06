@@ -811,7 +811,7 @@ def simulate_figure_8_srg(At=2, Bt=1, omega=0.5, z0=1):
 
     print(f'Shape of Target State: {target_state.shape}')
     for i in range(1, len(tt)):
-        xx = SRG_Simulation(
+        xx = SRG_Simulation_Linear(
             desired_state=target_state[i], initial_state=target_state[i-1])
         x_trajectory.append(xx)
 
@@ -910,7 +910,7 @@ def plot_SRG_controls(time_interval, controls):
     plt.show()
 
 
-def SRG_Simulation(desired_state, time_steps=0.0001,
+def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
                    initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
     """The state-reference governor simulation
 
@@ -1160,6 +1160,291 @@ def SRG_Simulation(desired_state, time_steps=0.0001,
     return xx, controls, time_interval
 
 
+
+def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
+                   initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
+    """The state-reference governor simulation
+
+    Args:
+        desired_state (vector): The target state
+        time_steps (float, optional): The time steps. Defaults to 0.0001.
+        initial_state (vector, optional): The initial state. Defaults to np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).
+
+    Returns:
+        Matrix: The state-matrix of the Euler simulation
+    """
+    x0 = initial_state
+
+    # Transforming the desired (target) point into a 4x1 vector
+    desired_coord = np.array([desired_state[i]
+                             for i in [1, 3, 5, 11]]).reshape(-1, 1)
+
+    # Initial feasible control vk (a 4x1 vector)
+    # (the first valid point along the line from A to B), this serves as the starting point
+    vk = 0.01 * desired_coord
+
+    # ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
+    ell_star = 100000
+
+    # ime interval for the continuous-time system
+    time_interval = np.arange(0, 10 + time_steps, time_steps)
+
+    # Number of time steps for Euler’s method loop
+    N = len(time_interval)
+
+    # S is a constraint matrix that uses the feedback matrices K and Kc. S @ x needs to be less than the constraints
+    S = np.block([[-K, Kc],
+                  [K, -Kc]])
+
+    # Defining the blocks for integral control, we need to use discrete versions of A_cl and B_cl
+    # so we obtain Ad and Bd to use in governor
+    Ac = np.zeros((4, 4))
+    Bc = np.eye(4)
+
+    Acl = np.block([
+        [A - B @ K, B @ Kc],
+        [-Bc @ C, Ac]
+    ])
+
+    Bcl = np.vstack([np.zeros((12, 4)), Bc])
+    Ccl = np.hstack((C, np.zeros((C.shape[0], C.shape[0]))))
+    Dcl = np.zeros((C.shape[0], B.shape[1]))
+
+    sys = ctrl.ss(Acl, Bcl, Ccl, Dcl)
+    sysd = ctrl.c2d(sys, time_steps)
+
+    # The final discrete matrices to use in the closed-loop system
+    Ad = sysd.A
+    Bd = sysd.B
+
+    # This function constructs the constraint matrix Hx (which places constraints on states)
+
+    def construct_Hx(S, Ad, ell_star):
+        """Construct the Hx contraint matrix Hx
+
+        Args:
+            S (matrix): A constraint block matrix of K and Kc
+            Ad (matrix): Discrete A control matrix
+            ell_star (int): number of iterations (timesteps)
+
+        Returns:
+            matrix: The constraint matrix Hx
+        """
+
+        Hx = []
+
+        # First element is Sx
+        Hx.append(S)
+
+        # For every time step, construct new constraints on the state
+        for ell in range(ell_star + 1):
+
+            Ax = np.linalg.matrix_power(Ad, ell)
+
+            Hx.append(S @ Ax)
+
+        return np.vstack(Hx)
+
+    # This function constructs the constraint matrix Hv (constraints on control values)
+
+    def construct_Hv(S, Ad, Bd, ell_star):
+        """Construct the Hv constraint matrix
+
+        Args:
+            S (matrix): A constraint block matrix of K and Kc
+            Ad (matrix): Discrete A control matrix
+            x (vector): Future update of state using "predict_future_state()" function
+            ell_star (int): number of iterations (timesteps)
+            Bd (matrix): Discrete B control matrix
+
+        Returns:
+            matrix: The constraint matrix Hv
+        """
+        # First element is 0
+        Hv = [np.zeros((S.shape[0], Bd.shape[1]))]
+        Hv.append(S @ Bd)
+
+        # For every time step, construct new constraints on the control
+        for ell in range(1, ell_star + 1):
+
+            # Calculate A_d^ℓ
+            Ad_ell = np.linalg.matrix_power(Ad, ell)
+
+            I = np.eye(Ad.shape[0])
+            Ad_inv_term = np.linalg.inv(I - Ad)
+
+            I_minus_Ad_ell = I - Ad_ell
+
+            # Compute the entire expression
+            result = S @ Ad_inv_term @ I_minus_Ad_ell @ Bd
+
+            Hv.append(result)
+
+        return np.vstack(Hv)
+
+    # This function constructs h
+
+    def construct_h(s, epsilon, ell_star):
+        """Construct the contraint matrix h
+
+        Args:
+            s (vector): The constraint vector
+            epsilon (float): A small positive number
+            ell_star (int): number of iterations (timesteps)
+
+        Returns:
+            matrix: The constraint matrix h
+        """
+
+        h = [s] * ell_star
+
+        # Last element is s - epsilon (epsilon is small positive number)
+        h.append(s - epsilon)
+
+        return np.array(h)
+
+    # Constructing contraint matrices and constraint vector s
+    Hx = construct_Hx(S, Ad, ell_star)
+    Hv = construct_Hv(S, Ad, Bd, ell_star)
+    s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005]).T
+    epsilon = 0.005
+    h = construct_h(s, epsilon, ell_star)
+
+    # Initialize x array (evolving state over time)
+    xx = np.zeros((16, N))
+    xx[:, 0] = x0.flatten()
+
+    # Reference governor computation
+
+    def rg(Hx, Hv, h, desired_coord, vk, state, j):
+        """The scalar reference governor returns a scalar values (one) representing the maximum feasible step
+           toward the desired coordinates.
+
+        Args:
+            Hx (matrix): A constraint matrix
+            Hv (matrix): A constraint matrix
+            h (matrix): A constraint matrix
+            desired_coord (vector): The desired coordinates for the quadrotor
+            vk (vector): The control
+            state (vector): The current state
+            j (int): An index for the simulation loop
+
+        Returns:
+            float: A kappa value
+        """
+        kappa_list = []
+
+        # Computing K*_j for each constraint inequality
+        for i in range(h[j].shape[0]):
+
+            Bj = h[j][i] - (Hx[j] @ state) - (Hv[j] @ vk)
+
+            Aj = Hv[j].T @ (desired_coord - vk)
+
+            # If Aj <= 0, we set kappa-star to 1
+            if Aj <= 0:
+                kappa = 1
+                kappa_list.append(kappa)
+
+            else:
+
+                kappa = Bj / Aj 
+                
+                #If kappa is infeasible
+                if kappa < 0 or kappa > 1:
+                    kappa = 0
+
+                kappa_list.append(kappa)
+
+        # Min kappa-star out of the 8 inequalities is optimal solution
+        return min(kappa_list)
+
+    # The control function for Euler simulation
+
+    def qds_dt(x, vk):
+        """Defines the change in state for the first 12 (non-integral)
+
+        Args:
+            x (vector): The current state
+            vk (vector): 
+
+
+        Returns:
+            vector: The change in the state
+        """
+
+        #Unpack current state
+        u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = x
+        
+        #Calculate error between current state and target state
+        normal_error = x[:12] - target_state[:12]  
+        integral_error = np.array(vk).reshape(1,4)[0] - np.array(target_state)[[1, 3, 5, 11]] 
+
+        #Calculate control with both proportional and integral components
+        control = -K @ normal_error + Kc @ integral_error
+
+        #Decompose control outputs
+        F = control[0] + Mq * g  # Force -> Throttle
+        TauPhi = control[1]      # Roll torque
+        TauTheta = control[2]    # Pitch torque
+        TauPsi = control[3]      # Yaw torque
+
+        #Calculate nonlinear dynamics for linear velocities
+        uDot = (r * v - q * w) - g * np.sin(theta)
+        vDot = (p * w - r * u) + g * np.cos(theta) * np.sin(phi)
+        wDot = (q * u - p * v) + g * np.cos(theta) * np.cos(phi) - F / Mq
+
+        #Calculate nonlinear dynamics for angular velocities
+        pDot = ((Jy - Jz) / Jx) * q * r + (1 / Jx) * TauPhi
+        qDot = ((Jz - Jx) / Jy) * p * r + (1 / Jy) * TauTheta
+        rDot = ((Jx - Jy) / Jz) * p * q + (1 / Jz) * TauPsi
+
+        #Position dynamics
+        PxDot = u
+        PyDot = v
+        PzDot = w
+
+        #Prepare the state derivative vector (to be returned for integration)
+        state_dot = [
+            uDot, PxDot, vDot, PyDot, wDot, PzDot, 
+            pDot, p, qDot, q, rDot, r,
+            integral_error[0], integral_error[1], integral_error[2], integral_error[3]
+        ]
+
+        state_dot = np.array([float(el) for el in state_dot])
+        
+        return state_dot, control
+        
+
+    # Main simulation loop for SRG Euler simulation
+
+    # Sampling time for reference governor (ts1 > time_steps)
+    ts1 = 0.001
+
+    controls = np.zeros((4, N))
+
+    for i in range(1, N):
+
+        t = (i - 1) * time_steps
+
+        if (t % ts1) < time_steps and i != 1:
+
+            # Getting kappa_t solution from reference governor
+            # We select the minimum feasible kappa-star as the solution
+            kappa = min(rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1), 1)
+
+            # Updating vk
+            vk = vk + kappa * (desired_coord - vk)
+
+        state_change, controls_t = qds_dt(xx[:, i-1], vk)
+        controls[:, i] = controls_t.reshape(1, 4)[0]
+
+        xx[:, i] = xx[:, i-1] + state_change * time_steps
+
+
+    return xx, controls, time_interval
+
+
 if __name__ == '__main__':
     print("Main started")
 
@@ -1184,7 +1469,7 @@ if __name__ == '__main__':
     # if no bounds are passed default will be unbounded (bounds = 0)
 
     # Run simulation
-    simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
+    #simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
     # simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
@@ -1196,8 +1481,11 @@ if __name__ == '__main__':
     # simulate_quadrotor_linear_controller(target_state, bounds=(0.4, 0))
 
     # clear_bound_values()
-    xx, controls, time_interval = SRG_Simulation(desired_state=target_state_integral)
-    plot_SRG_controls(time_interval, controls)
+    #xx, controls, time_interval = SRG_Simulation_Linear(desired_state=target_state_integral)
+    xx, controls, time_interval = SRG_Simulation_Nonlinear(desired_state=target_state_integral)
+    plot_SRG_simulation(time_interval, xx)
+    #xx, controls, time_interval = SRG_Simulation_Linear(desired_state=target_state_integral)
+    #plot_SRG_controls(time_interval, controls)
     # simulate_figure_8()
     # simulate_quadrotor_nonlinear_controller(target_state=target_state)
     # print(f'Max force before bound: {np.max(force_before_bound)}')
