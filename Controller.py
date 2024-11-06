@@ -253,22 +253,26 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
 
     #Call control function
     control = calculate_control(curstate_integral)
+
+    F = control[0] + Mq * g  # Force -> Throttle
+    TauPhi = control[1]     # Roll torque
+    TauTheta = control[2]   # Pitch torque
+    TauPsi = control[3]     # Yaw Torque
     
-    # Calculate nonlinear dynamics for linear velocities
-    uDot = (r * v - q * w) - g * np.sin(theta)
-    vDot = (p * w - r * u) + g * np.cos(theta) * np.sin(phi)
-    wDot = (q * u - p * v) + g * np.cos(theta) * np.cos(phi) - control[0] / Mq
+    # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
+    uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
+    vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
+    wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / Mq)
 
-    # Calculate nonlinear dynamics for angular velocities
-    pDot = ((Jy - Jz) / Jx) * q * r + (1 / Jx) * control[1]
-    qDot = ((Jz - Jx) / Jy) * p * r + (1 / Jy) * control[2]
-    rDot = ((Jx - Jy) / Jz) * p * q + (1 / Jz) * control[3]
+    # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
+    pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
+    qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
+    rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
 
-    # Position dynamics
     PxDot = u
     PyDot = v
     PzDot = w
-
+    
     # Prepare the state derivative vector (to be returned for integration)
     state_dot = [
         uDot, PxDot, vDot, PyDot, wDot, PzDot, 
@@ -1399,18 +1403,22 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
         #Call control function
         control = calculate_control(x)
+
+        F = control[0] + Mq * g  # Force -> Throttle
+        TauPhi = control[1]     # Roll torque
+        TauTheta = control[2]   # Pitch torque
+        TauPsi = control[3]     # Yaw Torque
         
-        # Calculate nonlinear dynamics for linear velocities
-        uDot = (r * v - q * w) - g * np.sin(theta)
-        vDot = (p * w - r * u) + g * np.cos(theta) * np.sin(phi)
-        wDot = (q * u - p * v) + g * np.cos(theta) * np.cos(phi) - control[0] / Mq
+        # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
+        uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
+        vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
+        wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / Mq)
 
-        # Calculate nonlinear dynamics for angular velocities
-        pDot = ((Jy - Jz) / Jx) * q * r + (1 / Jx) * control[1]
-        qDot = ((Jz - Jx) / Jy) * p * r + (1 / Jy) * control[2]
-        rDot = ((Jx - Jy) / Jz) * p * q + (1 / Jz) * control[3]
+        # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
+        pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
+        qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
+        rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
 
-        # Position dynamics
         PxDot = u
         PyDot = v
         PzDot = w
