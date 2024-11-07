@@ -234,22 +234,15 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
         """
         # Calculate proportional error for primary control
         normal_control = np.array(curstate_integral[:12])
-        integral_control = np.array(curstate_integral[12:])
+        error = np.array(curstate_integral)[[1, 3, 5, 11]] - np.array(target_state)[[1, 3, 5, 11]]
 
         # Calculate control with both proportional and integral components
-        control = -K @ normal_control + Kc @ integral_control
+        control = -K @ normal_control + Kc @ error
         
-        # Decompose control outputs for forces and torques
-        control[0] += Mq * g  # Adjust force (throttle) with gravitational force
-
         return control
 
     # Unpack current state
     u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = curstate_integral
-
-    error = np.array(curstate_integral)[[1, 3, 5, 11]] - np.array(target_state)[[1, 3, 5, 11]]
-
-    curstate_integral[12:] = error
 
     #Call control function
     control = calculate_control(curstate_integral)
@@ -265,9 +258,9 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
     wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / Mq)
 
     # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
-    pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
-    qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
-    rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
+    pDot = ((((Jy - Jz) * q * r) / Jx)) + ((1 / Jx) * TauPhi)
+    qDot = ((((Jz - Jx)* p * r) / Jy)) + ((1 / Jy) * TauTheta)
+    rDot = ((((Jx - Jy) * p * q) / Jz)) + ((1 / Jz) * TauPsi)
 
     PxDot = u
     PyDot = v
@@ -322,7 +315,7 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
     )
     Bcl = np.vstack([np.zeros((12, 4)), Bc])
 
-    control_matrix = np.zeros((4, len(total_time_steps)))
+    control_matrix = np.zeros((4, total_time_steps))
 
     # At each time-step, update the position array x_tot with the linear_dynamics
     for j in range(1, total_time_steps):
@@ -331,7 +324,7 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
         control_matrix[:, j] = control
         x_tot[:, j] = x0 * 2
 
-    return x_tot, control
+    return x_tot, control, time_range
 
 
 
@@ -815,7 +808,7 @@ def simulate_figure_8_srg(At=2, Bt=1, omega=0.5, z0=1):
     x_trajectory = np.concatenate(x_trajectory)
 
 
-def plot_SRG_simulation(time_interval, xx):
+def plot_SRG_simulation(time_interval, xx, target_state):
     """Plots the results of the SRG simulation
 
     Args:
@@ -825,7 +818,7 @@ def plot_SRG_simulation(time_interval, xx):
 
     # Plotting results
     fig = plt.figure(figsize=(12, 8))
-    fig.suptitle("Reference Governor Simulation with Integral Control")
+    fig.suptitle(f"Reference Governor Flight. \n Target state X: {target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}")
 
     # Change in X over time
     ax1 = fig.add_subplot(2, 2, 1)
@@ -1476,8 +1469,8 @@ if __name__ == '__main__':
         0, 0]     # angular velocity and position psi ]
 
     target_state_integral = [
-        0, 0,   # velocity and position on x
-        0, 0,    # velocity and position on y
+        0, 5,   # velocity and position on x
+        0, 5,    # velocity and position on y
         0, 5,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
@@ -1489,7 +1482,8 @@ if __name__ == '__main__':
 
     # Run simulation
     results, control, time_interval = simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
-    plot_SRG_simulation(time_interval, results)
+    #results, control, time_interval = simulate_linear_integral_with_euler(target_state=target_state_integral)
+    plot_SRG_simulation(time_interval, results, target_state_integral)
     # simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
