@@ -220,34 +220,23 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
     """
 
     def calculate_control(curstate_integral):
-        """
-        Calculate the control based on the error and integral components.
-        
-        Args:
-            curstate_integral (array): The current state of the quadrotor
-            target_state (array): The target state of the quadrotor
-            K (array): Proportional gain matrix
-            Kc (array): Integral gain matrix
 
-        Returns:
-            array: The control vector
-        """
-        # Calculate proportional error for primary control
         normal_control = np.array(curstate_integral[:12])
-        error = np.array(curstate_integral)[[1, 3, 5, 11]] - np.array(target_state)[[1, 3, 5, 11]]
+        integral_control = np.array(curstate_integral[12:])
 
-        # Calculate control with both proportional and integral components
-        control = -K @ normal_control + Kc @ error
-        
+        control = (-K @ normal_control) + (Kc @ integral_control)
+
         return control
 
-    # Unpack current state
     u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = curstate_integral
 
-    #Call control function
     control = calculate_control(curstate_integral)
 
-    F = control[0] + Mq * g  # Force -> Throttle
+    error = np.array(target_state)[[1, 3, 5, 11]] - np.array(curstate_integral)[[1, 3, 5, 11]] 
+
+    curstate_integral[12:] = error
+
+    F0 = control[0] 
     TauPhi = control[1]     # Roll torque
     TauTheta = control[2]   # Pitch torque
     TauPsi = control[3]     # Yaw Torque
@@ -255,22 +244,21 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
     # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
     uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
     vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
-    wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / Mq)
+    wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F0 / Mq)
 
     # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
-    pDot = ((((Jy - Jz) * q * r) / Jx)) + ((1 / Jx) * TauPhi)
-    qDot = ((((Jz - Jx)* p * r) / Jy)) + ((1 / Jy) * TauTheta)
-    rDot = ((((Jx - Jy) * p * q) / Jz)) + ((1 / Jz) * TauPsi)
+    pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
+    qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
+    rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
 
     PxDot = u
     PyDot = v
     PzDot = w
-    
-    # Prepare the state derivative vector (to be returned for integration)
+
     state_dot = [
         uDot, PxDot, vDot, PyDot, wDot, PzDot, 
         pDot, p, qDot, q, rDot, r,
-        i1, i2, i3, i4
+        error[0], error[1], error[2], error[3]
     ]
 
     state_dot = np.array([float(el) for el in state_dot])
@@ -358,6 +346,7 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
         x0 =  state_change * time_step + x0
         control_matrix[:, j] = control
         x_tot[:, j] = x0 
+        x_tot[:, j] = x0 * 2
 
     return x_tot, control, time_range
 
@@ -1469,9 +1458,9 @@ if __name__ == '__main__':
         0, 0]     # angular velocity and position psi ]
 
     target_state_integral = [
-        0, 5,   # velocity and position on x
-        0, 5,    # velocity and position on y
-        0, 5,    # velocity and position on z
+        0, 10,   # velocity and position on x
+        0, 0,    # velocity and position on y
+        0, 0,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0,     # angular velocity and position psi ]
