@@ -138,7 +138,7 @@ def linear_dynamics_ivp(t, curstate, A, B, target_state, bounds):
 
 
 def linear_dynamics_ode(current_state, t, K, A, B, target_state):
-    # We must have different functions for ode and ivp even though they perform the same calculation because the order 
+    # We must have different functions for ode and ivp even though they perform the same calculation because the order
     # of the arguments is different
 
     error = current_state - target_state
@@ -244,7 +244,7 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
     error = np.array(target_state)[[1, 3, 5, 11]] - np.array(curstate_integral)[[1, 3, 5, 11]] 
     curstate_integral[12:] = error
 
-    F0 = control[0] 
+    F0 = control[0]
     TauPhi = control[1]     # Roll torque
     TauTheta = control[2]   # Pitch torque
     TauPsi = control[3]     # Yaw Torque
@@ -264,14 +264,14 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
     PzDot = w
 
     state_dot = [
-        uDot, PxDot, vDot, PyDot, wDot, PzDot, 
+        uDot, PxDot, vDot, PyDot, wDot, PzDot,
         pDot, p, qDot, q, rDot, r,
         error[0], error[1], error[2], error[3]
     ]
 
     state_dot = np.array([float(el) for el in state_dot])
     control = np.array([float(el) for el in control])
-    
+
     return state_dot, control
 
 
@@ -315,8 +315,9 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
 
     # At each time-step, update the position array x_tot with the linear_dynamics (Euler method loop)
     for j in range(1, total_time_steps):
-        state_change, control = linear_dynamics_integral(j, x0, Acl, Bcl, target_state)
-        x0 =  state_change * time_step + x0
+        state_change, control = linear_dynamics_integral(
+            j, x0, Acl, Bcl, target_state)
+        x0 = state_change * time_step + x0
         control_matrix[:, j] = control
         x_tot[:, j] = x0 * 2
 
@@ -344,15 +345,16 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
     # The first time step is equal to the initial state of the quadrotor
     x_tot[:, 0] = initial_state
 
-    #For plotting controls to see if constraints violated
+    # For plotting controls to see if constraints violated
     control_matrix = np.zeros((4, total_time_steps))
 
     # At each time-step, update the position array x_tot with the nonlinear dynamics (Euler Loop)
     for j in range(1, total_time_steps):
-        state_change, control = nonlinear_dynamics_integral(j, x0, target_state)
-        x0 =  state_change * time_step + x0
+        state_change, control = nonlinear_dynamics_integral(
+            j, x0, target_state)
+        x0 = state_change * time_step + x0
         control_matrix[:, j] = control
-        x_tot[:, j] = x0 
+        x_tot[:, j] = x0
         x_tot[:, j] = x0 * 2
 
     return x_tot, control, time_range
@@ -714,7 +716,8 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
 
     # Plotting
     fig = plt.figure(figsize=(18, 12))
-    fig.suptitle(f"Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {Bt}, and Angular Velocity {omega}", fontsize=14)
+    fig.suptitle(f"Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {
+                 Bt}, and Angular Velocity {omega}", fontsize=14)
 
     # Create 2x2 subplots
     axs = fig.add_subplot(2, 2, 1)
@@ -797,12 +800,66 @@ def simulate_figure_8_srg(At=2, Bt=1, omega=0.5, z0=1):
 
     print(f'Shape of Target State: {target_state.shape}')
     for i in range(1, len(tt)):
-        xx = SRG_Simulation_Linear(
+        print(f'Iteration: {i}')
+        results, control, time_interval = SRG_Simulation_Linear(
             desired_state=target_state[i], initial_state=target_state[i-1])
-        x_trajectory.append(xx)
+        x_trajectory.append(results[:, -1])
 
     # Converting the python list into numpy array
-    x_trajectory = np.concatenate(x_trajectory)
+    x_trajectory = np.vstack(x_trajectory)
+
+    # Extract x, y, z from indices 1, 3, and 5 in x_trajectory
+    x_vals = x_trajectory[:, 1]
+    y_vals = x_trajectory[:, 3]
+    z_vals = x_trajectory[:, 5]
+    time_vals = np.linspace(0, T, len(x_trajectory))
+
+    # Plotting
+    fig = plt.figure(figsize=(18, 12))
+    fig.suptitle(f"Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {
+                 Bt}, and Angular Velocity {omega}", fontsize=14)
+
+    # Create 2x2 subplots
+    axs = fig.add_subplot(2, 2, 1)
+    axs.set_title("Quadrotor Figure-8 Path")
+    axs.plot(x_vals, y_vals, label="Path of Quadrotor in Figure Eight")
+    axs.set_xlabel("X (meters)")
+    axs.set_ylabel("Y (meters)")
+
+    # Plotting X-coordinate over time
+    axs = fig.add_subplot(2, 2, 2)
+    axs.plot(time_vals, x_vals, label="X-coordinate over time")
+    axs.set_xlabel("Time (seconds)")
+    axs.set_ylabel("X (meters)")
+    axs.set_title("X-Coordinates of the Quadrotor Over Time")
+
+    # Plotting Y-coordinate over time
+    axs = fig.add_subplot(2, 2, 3)
+    axs.plot(time_vals, y_vals, label="Y-coordinate over time")
+    axs.set_xlabel("Time (seconds)")
+    axs.set_ylabel("Y (meters)")
+    axs.set_title("Y-Coordinates of the Quadrotor Over Time")
+
+    # Plotting Z-coordinate over time (constant altitude)
+    axs = fig.add_subplot(2, 2, 4)
+    axs.plot(time_vals, z_vals, label="Z-coordinate over time")
+    axs.set_xlabel("Time (seconds)")
+    axs.set_ylabel("Z (meters)")
+    axs.set_title("Z-Coordinates of the Quadrotor Over Time")
+
+    # Adding a 3D plot to show x_vals, y_vals, and z_vals trajectory
+    fig_3d = plt.figure(figsize=(10, 8))
+    ax_3d = fig_3d.add_subplot(111, projection='3d')
+    ax_3d.plot(x_vals, y_vals, z_vals,
+               label="3D Path of Quadrotor in Figure Eight")
+    ax_3d.set_xlabel("X (meters)")
+    ax_3d.set_ylabel("Y (meters)")
+    ax_3d.set_zlabel("Z (meters)")
+    ax_3d.set_title("3D Trajectory of Quadrotor Figure-8 Path")
+    ax_3d.legend()
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.show()
 
 
 def plot_SRG_simulation(time_interval, xx, target_state, kappas, ts1):
@@ -872,7 +929,8 @@ def plot_SRG_controls(time_interval, controls, target_state):
 
     # Plot for controls[0]
     axs[0, 0].plot(time_interval, controls[0, :], label='Control 1')
-    axs[0, 0].axhline(y=6, color='red', linestyle='--', label='Constraint at 6')
+    axs[0, 0].axhline(y=6, color='red', linestyle='--',
+                      label='Constraint at 6')
     axs[0, 0].set_title('Control Variable 1')
     axs[0, 0].set_xlabel('Time')
     axs[0, 0].set_ylabel('Control 1')
@@ -880,7 +938,8 @@ def plot_SRG_controls(time_interval, controls, target_state):
 
     # Plot for controls[1]
     axs[0, 1].plot(time_interval, controls[1, :], label='Control 2')
-    axs[0, 1].axhline(y=0.005, color='red', linestyle='--', label='Constraint at 0.005')
+    axs[0, 1].axhline(y=0.005, color='red', linestyle='--',
+                      label='Constraint at 0.005')
     axs[0, 1].set_title('Control Variable 2')
     axs[0, 1].set_xlabel('Time')
     axs[0, 1].set_ylabel('Control 2')
@@ -888,7 +947,8 @@ def plot_SRG_controls(time_interval, controls, target_state):
 
     # Plot for controls[2]
     axs[1, 0].plot(time_interval, controls[2, :], label='Control 3')
-    axs[1, 0].axhline(y=0.005, color='red', linestyle='--', label='Constraint at 0.005')
+    axs[1, 0].axhline(y=0.005, color='red', linestyle='--',
+                      label='Constraint at 0.005')
     axs[1, 0].set_title('Control Variable 3')
     axs[1, 0].set_xlabel('Time')
     axs[1, 0].set_ylabel('Control 3')
@@ -896,7 +956,8 @@ def plot_SRG_controls(time_interval, controls, target_state):
 
     # Plot for controls[3]
     axs[1, 1].plot(time_interval, controls[3, :], label='Control 4')
-    axs[1, 1].axhline(y=0.005, color='red', linestyle='--', label='Constraint at 0.005')
+    axs[1, 1].axhline(y=0.005, color='red', linestyle='--',
+                      label='Constraint at 0.005')
     axs[1, 1].set_title('Control Variable 4')
     axs[1, 1].set_xlabel('Time')
     axs[1, 1].set_ylabel('Control 4')
@@ -907,7 +968,7 @@ def plot_SRG_controls(time_interval, controls, target_state):
 
 
 def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
-                   initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
+                          initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
     """The state-reference governor simulation with linear dynamics
 
     Args:
@@ -929,7 +990,9 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
     vk = 0.01 * desired_coord
 
     # ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
-    ell_star = 100000
+    # ell_star = 100000
+    # make ell_star to be 10 or 100 when doing figure 8
+    ell_star = 100
 
     # ime interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
@@ -1062,8 +1125,8 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
     # Reference governor computation
 
     def rg(Hx, Hv, h, desired_coord, vk, state, j):
-        """The scalar reference governor returns a scalar values (one) representing the maximum feasible step
-           toward the desired coordinates.
+        """The scalar reference governor returns a scalar value (one) representing the maximum feasible step
+        toward the desired coordinates.
 
         Args:
             Hx (matrix): A constraint matrix
@@ -1079,6 +1142,9 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
         """
         kappa_list = []
 
+        # Bound `j` within the range of `h`
+        j = min(j, h.shape[0] - 1)
+
         # Computing K*_j for each constraint inequality
         for i in range(h[j].shape[0]):
 
@@ -1092,10 +1158,9 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
                 kappa_list.append(kappa)
 
             else:
+                kappa = Bj / Aj
 
-                kappa = Bj / Aj 
-                
-                #If kappa is infeasible
+                # If kappa is infeasible
                 if kappa < 0 or kappa > 1:
                     kappa = 0
 
@@ -1158,9 +1223,8 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
     return xx, controls, time_interval, np.array(kappas), ts1
 
 
-
 def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
-                   initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
+                             initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
     """The state-reference governor simulation with Nonlinear dynamics
 
     Args:
@@ -1346,9 +1410,9 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
             else:
 
-                kappa = Bj / Aj 
-                
-                #If kappa is infeasible
+                kappa = Bj / Aj
+
+                # If kappa is infeasible
                 if kappa < 0 or kappa > 1:
                     kappa = 0
 
@@ -1374,7 +1438,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
         def calculate_control(curstate_integral):
             """
             Calculate the control based on the error and integral components.
-            
+
             Args:
                 curstate_integral (array): The current state of the quadrotor
                 target_state (array): The target state of the quadrotor
@@ -1400,18 +1464,19 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
         x[12:] = error
 
-        #Call control function
+        # Call control function
         control = calculate_control(x)
 
         F = control[0] 
         TauPhi = control[1]     # Roll torque
         TauTheta = control[2]   # Pitch torque
         TauPsi = control[3]     # Yaw Torque
-        
+
         # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
         uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
         vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
-        wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F / Mq)
+        wDot = ((q * u) - (p * v)) + \
+            (g * np.cos(theta) * np.cos(phi)) + (-F / Mq)
 
         # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
         pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
@@ -1424,16 +1489,16 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
         # Prepare the state derivative vector (to be returned for integration)
         state_dot = [
-            uDot, PxDot, vDot, PyDot, wDot, PzDot, 
+            uDot, PxDot, vDot, PyDot, wDot, PzDot,
             pDot, p, qDot, q, rDot, r,
             error[0], error[1], error[2], error[3]
         ]
 
         state_dot = np.array([float(el) for el in state_dot])
         control = np.array([float(el) for el in control])
-        
+
         return state_dot, control
-        
+
     # Main simulation loop for SRG Euler simulation
 
     # Sampling time for reference governor (ts1 > time_steps)
@@ -1458,7 +1523,6 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
         controls[:, i] = controls_t.reshape(1, 4)[0]
 
         xx[:, i] = xx[:, i-1] + state_change * time_steps
-
 
     return xx, controls, time_interval
 
