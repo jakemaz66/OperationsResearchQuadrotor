@@ -229,14 +229,12 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
             array: 1x4 control vector
         """
 
-        normal_control = np.array(curstate_integral[:12])
-        integral_control = np.array(curstate_integral[12:])
 
-        control = (-K @ normal_control) + (Kc @ integral_control)
+        control = np.block([-K, Kc]) @ curstate_integral
 
         return control
 
-    u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = curstate_integral
+    u, Px, v, Py, w, Pz, p, phi, q, theta, r, psi, i1, i2, i3, i4 = curstate_integral
 
     control = calculate_control(curstate_integral)
 
@@ -244,7 +242,7 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
     error = np.array(target_state)[[1, 3, 5, 11]] - np.array(curstate_integral)[[1, 3, 5, 11]] 
     curstate_integral[12:] = error
 
-    F0 = control[0]
+    F0 = control[0] + Mq * g
     TauPhi = control[1]     # Roll torque
     TauTheta = control[2]   # Pitch torque
     TauPsi = control[3]     # Yaw Torque
@@ -354,10 +352,9 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
             j, x0, target_state)
         x0 = state_change * time_step + x0
         control_matrix[:, j] = control
-        x_tot[:, j] = x0
-        x_tot[:, j] = x0 * 2
+        x_tot[:, j] = x0 * 3
 
-    return x_tot, control, time_range
+    return x_tot, control_matrix, time_range
 
 
 def simulate_quadrotor_linear_integral_controller(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
@@ -716,8 +713,7 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
 
     # Plotting
     fig = plt.figure(figsize=(18, 12))
-    fig.suptitle(f"Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {
-                 Bt}, and Angular Velocity {omega}", fontsize=14)
+    fig.suptitle(f"Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {Bt}, and Angular Velocity {omega}", fontsize=14)
 
     # Create 2x2 subplots
     axs = fig.add_subplot(2, 2, 1)
@@ -816,8 +812,7 @@ def simulate_figure_8_srg(At=2, Bt=1, omega=0.5, z0=1):
 
     # Plotting
     fig = plt.figure(figsize=(18, 12))
-    fig.suptitle(f"Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {
-                 Bt}, and Angular Velocity {omega}", fontsize=14)
+    fig.suptitle(f"Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {Bt}, and Angular Velocity {omega}", fontsize=14)
 
     # Create 2x2 subplots
     axs = fig.add_subplot(2, 2, 1)
@@ -862,7 +857,7 @@ def simulate_figure_8_srg(At=2, Bt=1, omega=0.5, z0=1):
     plt.show()
 
 
-def plot_SRG_simulation(time_interval, xx, target_state, kappas, ts1):
+def plot_SRG_simulation(time_interval, xx, target_state, kappas):
     """Plots the results of the SRG simulation
 
     Args:
@@ -1220,7 +1215,7 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
         xx[:12, i] = xx[:12, i-1] + \
             qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
 
-    return xx, controls, time_interval, np.array(kappas), ts1
+    return xx, controls, time_interval, np.array(kappas)
 
 
 def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
@@ -1448,37 +1443,29 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
             Returns:
                 array: The control vector
             """
-            # Calculate proportional error for primary control
-            normal_control = np.array(curstate_integral[:12])
-            integral_control = np.array(curstate_integral[12:])
-
-            # Calculate control with both proportional and integral components
-            control = -K @ normal_control + Kc @ integral_control
+            control = np.block([-K, Kc]) @ curstate_integral
 
             return control
 
-        # Unpack current state
-        u, Px, v, Py, w, Pz, phi, p, theta, q, psi, r, i1, i2, i3, i4 = x
+        u, Px, v, Py, w, Pz, p, phi, q, theta, r, psi, i1, i2, i3, i4 = x
 
-        error = np.array(target_state)[[1, 3, 5, 11]] - np.array(vk)[[1, 3, 5, 11]] 
-
-        x[12:] = error
-
-        # Call control function
         control = calculate_control(x)
 
-        F = control[0] 
+        #Updating integral states
+        error = np.array(target_state)[[1, 3, 5, 11]] - np.array(vk).reshape(1,4)[0]
+        x[12:] = error
+
+        F0 = control[0] + Mq * g
         TauPhi = control[1]     # Roll torque
         TauTheta = control[2]   # Pitch torque
         TauPsi = control[3]     # Yaw Torque
-
-        # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
+        
+        #Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
         uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
         vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
-        wDot = ((q * u) - (p * v)) + \
-            (g * np.cos(theta) * np.cos(phi)) + (-F / Mq)
+        wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F0 / Mq)
 
-        # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
+        #Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
         pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
         qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
         rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
@@ -1487,7 +1474,6 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
         PyDot = v
         PzDot = w
 
-        # Prepare the state derivative vector (to be returned for integration)
         state_dot = [
             uDot, PxDot, vDot, PyDot, wDot, PzDot,
             pDot, p, qDot, q, rDot, r,
@@ -1505,6 +1491,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
     ts1 = 0.001
 
     controls = np.zeros((4, N))
+    kappas = []
 
     for i in range(1, N):
 
@@ -1515,6 +1502,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
             # Getting kappa_t solution from reference governor
             # We select the minimum feasible kappa-star as the solution
             kappa = min(rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1), 1)
+            kappas.append(kappa)
 
             # Updating vk
             vk = vk + kappa * (desired_coord - vk)
@@ -1522,9 +1510,9 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
         state_change, controls_t = qds_dt_nonlinear(xx[:, i-1], vk)
         controls[:, i] = controls_t.reshape(1, 4)[0]
 
-        xx[:, i] = xx[:, i-1] + state_change * time_steps
+        xx[:, i] =(xx[:, i-1] + state_change * time_steps)
 
-    return xx, controls, time_interval
+    return xx, controls, time_interval, kappas
 
 
 if __name__ == '__main__':
@@ -1539,9 +1527,9 @@ if __name__ == '__main__':
         0, 0]     # angular velocity and position psi ]
 
     target_state_integral = [
-        0, 0,   # velocity and position on x
-        0, 0,    # velocity and position on y
-        0, 100,    # velocity and position on z
+        0, 20,   # velocity and position on x
+        0, 10,    # velocity and position on y
+        0, 10,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0,     # angular velocity and position psi ]
@@ -1553,7 +1541,7 @@ if __name__ == '__main__':
     # Run simulation
     #results, control, time_interval = simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
     #results, control, time_interval = simulate_linear_integral_with_euler(target_state=target_state_integral)
-    #plot_SRG_simulation(time_interval, results, target_state_integral)
+    #plot_SRG_simulation(time_interval, results, target_state_integral, kappas=[0]*10001)
     # simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
@@ -1565,9 +1553,9 @@ if __name__ == '__main__':
     # simulate_quadrotor_linear_controller(target_state, bounds=(0.4, 0))
 
     # clear_bound_values()
-    xx, controls, time_interval, kappa, ts1 = SRG_Simulation_Linear(desired_state=target_state_integral)
-    #xx, controls, time_interval = SRG_Simulation_Nonlinear(desired_state=target_state_integral)
-    plot_SRG_simulation(time_interval, xx, target_state=target_state_integral, kappas=kappa, ts1=ts1)
+    #xx, controls, time_interval, kappa= SRG_Simulation_Linear(desired_state=target_state_integral)
+    xx, controls, time_interval, kappa = SRG_Simulation_Nonlinear(desired_state=target_state_integral)
+    plot_SRG_simulation(time_interval, xx, target_state=target_state_integral, kappas=kappa)
     #xx, controls, time_interval = SRG_Simulation_Linear(desired_state=target_state_integral)
     plot_SRG_controls(time_interval, controls, target_state)
     # simulate_figure_8()
