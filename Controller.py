@@ -198,8 +198,8 @@ def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
 
     # Getting 4x1 Integral u (error between X, Y, Z and Yaw)
     uc = (target_state[[1, 3, 5, 11]] - curstate_integral[[1, 3, 5, 11]])
-    
-    #Control law
+
+    # Control law
     Dotx = Ac @ curstate_integral + Bc @ uc
 
     return Dotx, uc
@@ -229,7 +229,6 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
             array: 1x4 control vector
         """
 
-
         control = np.block([-K, Kc]) @ curstate_integral
 
         return control
@@ -238,21 +237,22 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
 
     control = calculate_control(curstate_integral)
 
-    #Updating integral states
-    error = np.array(target_state)[[1, 3, 5, 11]] - np.array(curstate_integral)[[1, 3, 5, 11]] 
+    # Updating integral states
+    error = np.array(target_state)[[1, 3, 5, 11]] - \
+        np.array(curstate_integral)[[1, 3, 5, 11]]
     curstate_integral[12:] = error
 
     F0 = control[0] + Mq * g
     TauPhi = control[1]     # Roll torque
     TauTheta = control[2]   # Pitch torque
     TauPsi = control[3]     # Yaw Torque
-    
-    #Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
+
+    # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
     uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
     vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
     wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F0 / Mq)
 
-    #Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
+    # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
     pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
     qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
     rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
@@ -357,8 +357,8 @@ def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0,
     return x_tot, control_matrix, time_range
 
 
-def simulate_quadrotor_linear_integral_controller(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
-                                                time_span=[0, 10]):
+def simulate_quadrotor_linear_integral_controller(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                                                  time_span=[0, 10]):
     """
         This function simulates the quadrotor moving from a an initial point, taking off to a desired point,
        and hovering around this desired point, but uses the integral controller matrix Kc.
@@ -713,7 +713,8 @@ def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
 
     # Plotting
     fig = plt.figure(figsize=(18, 12))
-    fig.suptitle(f"Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {Bt}, and Angular Velocity {omega}", fontsize=14)
+    fig.suptitle(f"""Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {
+                 Bt}, and Angular Velocity {omega}""", fontsize=14)
 
     # Create 2x2 subplots
     axs = fig.add_subplot(2, 2, 1)
@@ -794,12 +795,16 @@ def simulate_figure_8_srg(At=2, Bt=1, omega=0.5, z0=1):
     # Now make it move according to the new target states
     # Main loop that runs the figure-8 trajectory
 
-    print(f'Shape of Target State: {target_state.shape}')
-    for i in range(1, len(tt)):
-        print(f'Iteration: {i}')
-        results, control, time_interval = SRG_Simulation_Linear(
-            desired_state=target_state[i], initial_state=target_state[i-1])
+    length, _ = target_state.shape
+    for i in range(length - 1):
+        print(f'\r\033[92mIteration: {i+1}/{length}\033[0m', end='')
+        # results, control, time_interval, _ = SRG_Simulation_Linear(
+        #     desired_state=target_state[i+1], initial_state=target_state[i])
+        results, control, time_interval, _ = SRG_Simulation_Nonlinear(
+            desired_state=target_state[i+1], initial_state=target_state[i])
         x_trajectory.append(results[:, -1])
+
+    print("\n")
 
     # Converting the python list into numpy array
     x_trajectory = np.vstack(x_trajectory)
@@ -812,7 +817,8 @@ def simulate_figure_8_srg(At=2, Bt=1, omega=0.5, z0=1):
 
     # Plotting
     fig = plt.figure(figsize=(18, 12))
-    fig.suptitle(f"Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {Bt}, and Angular Velocity {omega}", fontsize=14)
+    fig.suptitle(f"""Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {
+                 Bt}, and Angular Velocity {omega}""", fontsize=14)
 
     # Create 2x2 subplots
     axs = fig.add_subplot(2, 2, 1)
@@ -869,7 +875,8 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
 
     # Plotting results
     fig = plt.figure(figsize=(12, 10))
-    fig.suptitle(f"Reference Governor Flight. \n Target state X: {target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}")
+    fig.suptitle(f"Reference Governor Flight. \n Target state X: {
+                 target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}")
 
     # Change in X over time
     ax1 = fig.add_subplot(3, 2, 1)
@@ -894,7 +901,8 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
 
     # 3D plot of X, Y, Z states
     ax4 = fig.add_subplot(3, 2, 4, projection='3d')
-    ax4.plot(xx[1, :], xx[3, :], xx[5, :], label='3D Trajectory', color='purple')
+    ax4.plot(xx[1, :], xx[3, :], xx[5, :],
+             label='3D Trajectory', color='purple')
     ax4.set_title('3D State Trajectory')
     ax4.set_xlabel('X Position')
     ax4.set_ylabel('Y Position')
@@ -902,7 +910,8 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
 
     # Kappas over time
     ax5 = fig.add_subplot(3, 1, 3)
-    ax5.plot(time_interval[::10], kappas[:len(time_interval[::10])], label='Kappas', color='red')
+    ax5.plot(time_interval[::10], kappas[:len(
+        time_interval[::10])], label='Kappas', color='red')
     ax5.set_title('Kappas over Time')
     ax5.set_xlabel('Time')
     ax5.set_ylabel('Kappa Value')
@@ -911,7 +920,7 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
     plt.show()
 
 
-def plot_SRG_controls(time_interval, controls, target_state): 
+def plot_SRG_controls(time_interval, controls, target_state):
     """Plots the control variables with constraints for the SRG simulation.
 
     Args:
@@ -920,7 +929,8 @@ def plot_SRG_controls(time_interval, controls, target_state):
         target_state (Vector): The target state
     """
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    fig.suptitle(f"SRG Control Variables with Constraints and Target X = {target_state[1]}, Y = {target_state[3]}, Z = {target_state[5]}")
+    fig.suptitle(f"SRG Control Variables with Constraints and Target X = {
+                 target_state[1]}, Y = {target_state[3]}, Z = {target_state[5]}")
 
     # Plot for controls[0]
     axs[0, 0].plot(time_interval, controls[0, :], label='Control 1')
@@ -985,9 +995,9 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
     vk = 0.01 * desired_coord
 
     # ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
-    # ell_star = 100000
-    # make ell_star to be 10 or 100 when doing figure 8
-    ell_star = 100
+    ell_star = 100000
+    # make ell_star to be 100 when doing figure 8
+    # ell_star = 100
 
     # ime interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
@@ -1242,6 +1252,8 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
     # ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
     ell_star = 100000
+    # make ell_star to be 100 when doing figure 8
+    # ell_star = 1000
 
     # ime interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
@@ -1390,6 +1402,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
             float: A kappa value
         """
         kappa_list = []
+        j = min(j, h.shape[0] - 1)
 
         # Computing K*_j for each constraint inequality
         for i in range(h[j].shape[0]):
@@ -1451,7 +1464,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
         control = calculate_control(x)
 
-        #Updating integral states
+        # Updating integral states
         error = target.reshape(1, 4)[0] - vk.reshape(1, 4)[0]
         x[12:] = error
 
@@ -1459,13 +1472,14 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
         TauPhi = control[1]     # Roll torque
         TauTheta = control[2]   # Pitch torque
         TauPsi = control[3]     # Yaw Torque
-        
-        #Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
+
+        # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
         uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
         vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
-        wDot = ((q * u) - (p * v)) + (g * np.cos(theta) * np.cos(phi)) + (-F0 / Mq)
+        wDot = ((q * u) - (p * v)) + \
+            (g * np.cos(theta) * np.cos(phi)) + (-F0 / Mq)
 
-        #Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
+        # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
         pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
         qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
         rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
@@ -1508,12 +1522,12 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
         xx[12:, i] = xx[12:, i-1] + \
             (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
-        
+
         state_change, control = qds_dt_nonlinear(xx[:, i-1], desired_coord, vk)
 
         xx[:12, i] = xx[:12, i-1] + \
             state_change[:12] * time_steps
-        
+
         controls[:, i] = control.reshape(1, 4)[0]
 
     return xx, controls, time_interval, kappas
@@ -1543,9 +1557,9 @@ if __name__ == '__main__':
     # if no bounds are passed default will be unbounded (bounds = 0)
 
     # Run simulation
-    #results, control, time_interval = simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
-    #results, control, time_interval = simulate_linear_integral_with_euler(target_state=target_state_integral)
-    #plot_SRG_simulation(time_interval, results, target_state_integral, kappas=[0]*10001)
+    # results, control, time_interval = simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
+    # results, control, time_interval = simulate_linear_integral_with_euler(target_state=target_state_integral)
+    # plot_SRG_simulation(time_interval, results, target_state_integral, kappas=[0]*10001)
     # simulate_linear_integral_with_euler(target_state=target_state_integral)
 
     # clear_bound_values()
@@ -1557,10 +1571,11 @@ if __name__ == '__main__':
     # simulate_quadrotor_linear_controller(target_state, bounds=(0.4, 0))
 
     # clear_bound_values()
-    #xx, controls, time_interval, kappa= SRG_Simulation_Linear(desired_state=target_state_integral)
-    xx, controls, time_interval, kappa = SRG_Simulation_Nonlinear(desired_state=target_state_integral)
-    plot_SRG_simulation(time_interval, xx, target_state=target_state_integral, kappas=kappa)
-    #xx, controls, time_interval = SRG_Simulation_Linear(desired_state=target_state_integral)
+    # xx, controls, time_interval, kappa= SRG_Simulation_Linear(desired_state=target_state_integral)
+    xx, controls, time_interval, kappa = SRG_Simulation_Nonlinear(
+        desired_state=target_state_integral)
+    plot_SRG_simulation(time_interval, xx,
+                        target_state=target_state_integral, kappas=kappa)
     plot_SRG_controls(time_interval, controls, target_state)
     # simulate_figure_8()
     # simulate_quadrotor_nonlinear_controller(target_state=target_state)
