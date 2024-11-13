@@ -1418,7 +1418,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
     # The control function for Euler simulation
 
-    def qds_dt_nonlinear(x, vk):
+    def qds_dt_nonlinear(x, target, vk):
         """Defines the change in state with non_linear dynamics
 
         Args:
@@ -1452,7 +1452,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
         control = calculate_control(x)
 
         #Updating integral states
-        error = np.array(target_state)[[1, 3, 5, 11]] - np.array(vk).reshape(1,4)[0]
+        error = target.reshape(1, 4)[0] - vk.reshape(1, 4)[0]
         x[12:] = error
 
         F0 = control[0] + Mq * g
@@ -1507,10 +1507,13 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
             # Updating vk
             vk = vk + kappa * (desired_coord - vk)
 
-        state_change, controls_t = qds_dt_nonlinear(xx[:, i-1], vk)
-        controls[:, i] = controls_t.reshape(1, 4)[0]
+        xx[12:, i] = xx[12:, i-1] + \
+            (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
 
-        xx[:, i] =(xx[:, i-1] + state_change * time_steps)
+        xx[:12, i] = xx[:12, i-1] + \
+            qds_dt_nonlinear(xx[:, i-1], desired_coord, vk)[0][:12] * time_steps
+        
+        controls[:, i] = qds_dt_nonlinear(xx[:, i-1], desired_coord, vk)[1].reshape(1, 4)[0]
 
     return xx, controls, time_interval, kappas
 
@@ -1519,7 +1522,7 @@ if __name__ == '__main__':
     print("Main started")
 
     target_state = [
-        0, 10,   # velocity and position on x
+        0, 0,   # velocity and position on x
         0, 10,    # velocity and position on y
         0, 10,    # velocity and position on z
         0, 0,     # angular velocity and position thi
@@ -1527,8 +1530,8 @@ if __name__ == '__main__':
         0, 0]     # angular velocity and position psi ]
 
     target_state_integral = [
-        0, 20,   # velocity and position on x
-        0, 10,    # velocity and position on y
+        0, 0,   # velocity and position on x
+        0, 0,    # velocity and position on y
         0, 10,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
