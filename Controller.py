@@ -875,8 +875,7 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
 
     # Plotting results
     fig = plt.figure(figsize=(12, 10))
-    fig.suptitle(f"Reference Governor Flight. \n Target state X: {
-                 target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}")
+    fig.suptitle(f"Reference Governor Flight. \n Target state X: {target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}")
 
     # Change in X over time
     ax1 = fig.add_subplot(3, 2, 1)
@@ -929,8 +928,7 @@ def plot_SRG_controls(time_interval, controls, target_state):
         target_state (Vector): The target state
     """
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    fig.suptitle(f"SRG Control Variables with Constraints and Target X = {
-                 target_state[1]}, Y = {target_state[3]}, Z = {target_state[5]}")
+    fig.suptitle(f"SRG Control Variables with Constraints and Target X = {target_state[1]}, Y = {target_state[3]}, Z = {target_state[5]}")
 
     # Plot for controls[0]
     axs[0, 0].plot(time_interval, controls[0, :], label='Control 1')
@@ -1098,7 +1096,7 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
     # This function constructs h
 
     def construct_h(s, epsilon, ell_star):
-        """Construct the contraint matrix h
+        """Construct the constraint matrix h
 
         Args:
             s (vector): The constraint vector
@@ -1178,7 +1176,6 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
 
     def qds_dt(x, uc, Acl, Bcl):
         """Defines the change in state for the first 12 (non-integral)
-
         Args:
             x (vector): The current state
             u (vector): The current error
