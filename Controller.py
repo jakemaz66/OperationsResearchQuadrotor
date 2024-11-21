@@ -197,7 +197,10 @@ def linear_dynamics_integral(t, curstate_integral, Ac, Bc, target_state):
     curstate_integral = np.array(curstate_integral)
 
     # Getting 4x1 Integral u (error between X, Y, Z and Yaw)
-    uc = (target_state[[1, 3, 5, 11]] - curstate_integral[[1, 3, 5, 11]])
+    # uc = (target_state[[1, 3, 5, 11]] - curstate_integral[[1, 3, 5, 11]])
+
+    # changed by maxi no error needed
+    uc = target_state[[1, 3, 5, 11]]
 
     # Control law
     Dotx = Ac @ curstate_integral + Bc @ uc
@@ -260,8 +263,9 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
     return state_dot, control
 
 
+
 def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                        total_time=10, time_step=0.00001):
+                                        total_time=10, time_step=0.0001):
     """This method simulates flight using the Euler method and linear integral control
 
     Args:   
@@ -273,6 +277,8 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
     # Constructing time steps
     time_range = np.arange(0, total_time + time_step, time_step)
     total_time_steps = len(time_range)
+
+    # total_time_steps = np.arange(0, total_time, time_step)
 
     x0 = np.zeros(16,)
 
@@ -300,10 +306,20 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
 
     # At each time-step, update the position array x_tot with the linear_dynamics (Euler method loop)
     for j in range(1, total_time_steps):
+        # control law:
+        # control = -K @ X0 + Kc @ Xc(Xc = control)
+
+        # update current state:
+        # X0 = x0 + linear_quad function
+
+
         state_change, control = linear_dynamics_integral(
             j, x0, Acl, Bcl, target_state)
+        
         x0 = state_change * time_step + x0
         control_matrix[:, j] = control
+
+
         x_tot[:, j] = x0 * 2
 
     return x_tot, control, time_range
@@ -759,7 +775,7 @@ def simulate_figure_8_srg(At=2, Bt=1, omega=0.5, z0=1):
     # Simulate only for one full time period T (start and end at the same point)
     T = 2*np.pi/omega
     # Number of time steps, this determines the precision of the figure-8 trajectory
-    tt = np.linspace(0, T, 1000)
+    tt = np.linspace(0, T, 100)
 
     # Obtaining the coordinates (trajectory) for each timestep in time_interval_range
     # Since z0 is constant, we'll add it manually here.
@@ -788,7 +804,7 @@ def simulate_figure_8_srg(At=2, Bt=1, omega=0.5, z0=1):
         # results, control, time_interval, _ = SRG_Simulation_Linear(
         #     desired_state=target_state[i+1], initial_state=target_state[i])
         results, control, time_interval, _ = SRG_Simulation_Nonlinear(
-            desired_state=target_state[i+1], initial_state=target_state[i])
+            desired_state=target_state[i+1], initial_state=target_state[i], ell_star_figure8=True)
         x_trajectory.append(results[:, -1])
 
     print("\n")
@@ -956,8 +972,6 @@ def plot_SRG_controls(time_interval, controls, target_state):
     plt.tight_layout()
     plt.show()
 
-# This function constructs h
-
 def construct_h(s, epsilon, ell_star):
     """Construct the contraint matrix h
 
@@ -1035,8 +1049,6 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
     Ad = sysd.A
     Bd = sysd.B
 
-
-
     # Constructing contraint matrices and constraint vector s
     Hx = construct_Hx(S, Ad, ell_star)
     Hv = construct_Hv(S, Ad, Bd, ell_star)
@@ -1049,9 +1061,7 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
     xx[:, 0] = x0.flatten()
 
 
-
     # The control function for Euler simulation
-
     def qds_dt(x, uc, Acl, Bcl):
         """Defines the change in state for the first 12 (non-integral)
         Args:
@@ -1068,7 +1078,6 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
         return (Acl @ x + (Bcl @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
 
     # Main simulation loop for SRG Euler simulation
-
     # Sampling time for reference governor (ts1 > time_steps)
     ts1 = 0.001
 
@@ -1227,7 +1236,7 @@ def construct_Hv(S, Ad, Bd, ell_star):
 
 
 def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
-                             initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
+                             initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), ell_star_figure8=False):
     """The state-reference governor simulation with Nonlinear dynamics
 
     Args:
@@ -1249,9 +1258,11 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
     vk = 0.01 * desired_coord
 
     # ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
-    ell_star = 100000
+    ell_star = 10000
     # make ell_star to be 100 when doing figure 8
-    # ell_star = 1000
+    if ell_star_figure8:
+        print("Here ell star figure eight")
+        ell_star = 100
 
     # ime interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
@@ -1348,6 +1359,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
     # Main simulation loop for SRG Euler simulation
     # Sampling time for reference governor (ts1 > time_steps)
+    # Maxi thinks ts1 < timesteps
     ts1 = 0.001
 
     controls = np.zeros((4, N))
@@ -1380,6 +1392,92 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
     return xx, controls, time_interval, kappas
 
 
+
+
+def simulate_figure8_srg_max():
+    """
+    THIS function just sends the drone to each point after each other. There is no threshhold used- distance or alike
+    """
+    # Define figure-8 waypoints
+    waypoints = [
+        [0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # Waypoint 1: Move to Z=5
+        [2.5, 0.0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ]
+
+
+    # Initial state for simulation
+    initial_state = np.array([0] * 16)
+
+    # Initialize storage for results
+    all_states = []
+    all_controls = []
+    kappas = []
+
+    for target_state in waypoints:
+        print(f"Moving to target: {target_state}")
+        distance = float('inf')
+        trajectory_states = []
+        controls = []
+        kappas_local = []
+
+        # Simulate until the drone is close enough to the waypoint
+
+
+        # while distance > 0.1:  # Adjust threshold if needed
+
+        xx, ctrl, time_interval, kappa = SRG_Simulation_Nonlinear(
+            desired_state=target_state,
+            initial_state=initial_state,
+            ell_star_figure8=True,
+        )
+
+        # Append trajectory and controls
+        trajectory_states.append(xx)
+        controls.append(ctrl)
+        kappas_local.extend(kappa)
+
+        # Calculate distance to the target
+        drone_pos = xx[[1, 3, 5], -1]  # Get last [x, y, z] from trajectory
+        target_pos = np.array(target_state[:3])  # Target [x, y, z]
+        print(f"Drone x position: {drone_pos[0]:.2f}, y position: {drone_pos[1]:.2f}")
+
+        # Calculate distance to the target using sqrt((dx)^2 + (dy)^2)
+        delta_x = drone_pos[0] - target_pos[0]  # Difference in x positions
+        delta_y = drone_pos[1] - target_pos[1]  # Difference in y positions
+        distance = np.sqrt(delta_x**2 + delta_y**2)  # Euclidean distance
+
+        # Update initial state for the next iteration
+        initial_state = xx[:, -1]  # Use the last state as the new initial state
+
+        # Store results after reaching the waypoint
+        all_states.append(np.hstack(trajectory_states))
+        all_controls.append(np.hstack(controls))
+        kappas.extend(kappas_local)
+
+    # Concatenate all trajectories
+    all_states = np.hstack(all_states)
+    all_controls = np.hstack(all_controls)
+
+    # Plotting the trajectory
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    ax.plot(all_states[1, :], all_states[3, :], all_states[5, :], label="Drone Path")
+    ax.scatter(
+        [waypoint[0] for waypoint in waypoints],
+        [waypoint[1] for waypoint in waypoints],
+        [waypoint[2] for waypoint in waypoints],
+        color='r', label="Waypoints"
+    )
+
+    ax.set_xlabel("X Position")
+    ax.set_ylabel("Y Position")
+    ax.set_zlabel("Z Position")
+    ax.set_title("Figure-8 Trajectory")
+    ax.legend()
+    plt.show()
+
+
 if __name__ == '__main__':
     print("Main started")
 
@@ -1391,7 +1489,7 @@ if __name__ == '__main__':
         0, 0,     # angular velocity and position thetha
         0, 0]     # angular velocity and position psi ]
 
-    target_state_integral = [
+    target_state_16 = [
         0, 10,   # velocity and position on x
         0, 10,    # velocity and position on y
         0, 10,    # velocity and position on z
@@ -1404,10 +1502,12 @@ if __name__ == '__main__':
     # if no bounds are passed default will be unbounded (bounds = 0)
 
     # Run simulation
-    # results, control, time_interval = simulate_nonlinear_integral_with_euler(target_state=target_state_integral)
-    # results, control, time_interval = simulate_linear_integral_with_euler(target_state=target_state_integral)
-    # plot_SRG_simulation(time_interval, results, target_state_integral, kappas=[0]*10001)
-    # simulate_linear_integral_with_euler(target_state=target_state_integral)
+    results, control, time_interval = simulate_nonlinear_integral_with_euler(target_state=target_state_16)
+    
+    # results, control, time_interval = simulate_linear_integral_with_euler(target_state=target_state_16)
+    # must change the kappa to 10001 when running linear integral with euler and to 1001 when running NONLINEAR
+    plot_SRG_simulation(time_interval, results, target_state_16, kappas=[0]*10001)
+
 
     # clear_bound_values()
     # simulate_quadrotor_nonlinear_controller(target_state)
@@ -1418,19 +1518,31 @@ if __name__ == '__main__':
     # simulate_quadrotor_linear_controller(target_state, bounds=(0.4, 0))
 
     # clear_bound_values()
-    # xx, controls, time_interval, kappa= SRG_Simulation_Linear(desired_state=target_state_integral)
+    # xx, controls, time_interval, kappas= SRG_Simulation_Linear(desired_state=target_state_16)
 
 
-    xx, controls, time_interval, kappas = SRG_Simulation_Nonlinear(
-        desired_state=target_state_integral)
+
+# Everything below is the Project Part B inbetween the lines ???????
+# ----------------------------------------------------------------
+
+    # xx, controls, time_interval, kappas= SRG_Simulation_Linear(desired_state=target_state_16)
+    # # xx, controls, time_interval, kappas = SRG_Simulation_Nonlinear(
+    # #     desired_state=target_state_16)
     
-    plot_SRG_simulation(time_interval, xx,
-                        target_state=target_state_integral, kappas=kappas)
+    # plot_SRG_simulation(time_interval, xx,
+    #                     target_state=target_state_16, kappas=kappas)
     
-    plot_SRG_controls(time_interval, controls, target_state)
+    # plot_SRG_controls(time_interval, controls, target_state)
+# ------------------------------------------------------------------
 
 
-    # simulate_figure_8()
+    # Chris Function: Takes forever????
+    # simulate_figure_8_srg(At=9, Bt=33, omega=.5, z0=12)
+    
+    # simulate_figure8_srg_max()
+
+
+# I think old stuff??    # simulate_figure_8()
     # simulate_quadrotor_nonlinear_controller(target_state=target_state)
     # print(f'Max force before bound: {np.max(force_before_bound)}')
     # print(f'Max force after bound: {np.max(force_after_bound)}')
@@ -1439,9 +1551,7 @@ if __name__ == '__main__':
     # simulate_quadrotor_nonlinear_controller(
     # target_state=target_state, bounds=(6, 0))
 
-    # simulate_quadrotor_linear_integral_controller(target_state=target_state_integral)
+    # simulate_quadrotor_linear_integral_controller(target_state=target_state_16)
 
     # Have not tested, or verified this simulate_figure_8 funtion
     # simulate_figure_8(At=9, Bt=33, omega=.5, z0=12)
-
-    simulate_figure_8_srg(At=9, Bt=33, omega=.5, z0=12)
