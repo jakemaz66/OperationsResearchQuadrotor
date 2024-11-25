@@ -955,7 +955,7 @@ def construct_h(s, epsilon, ell_star):
 
     return np.array(h)
 
-def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
+def SRG_Simulation_Linear(desired_state, time_steps=0.001,
                           initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
     """The state-reference governor simulation with linear dynamics
 
@@ -1007,7 +1007,10 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
     Dcl = np.zeros((C.shape[0], B.shape[1]))
 
     sys = ctrl.ss(Acl, Bcl, Ccl, Dcl)
-    sysd = ctrl.c2d(sys, time_steps)
+    # sysd = ctrl.c2d(sys, time_steps)
+
+    # HARd coded time to get thigns working
+    sysd = ctrl.c2d(sys, 0.01)
 
     # The final discrete matrices to use in the closed-loop system
     Ad = sysd.A
@@ -1053,6 +1056,8 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.0001,
         t = (i - 1) * time_steps
 
         if (t % ts1) < time_steps and i != 1:
+        
+
 
             # Getting kappa_t solution from reference governor
             # We select the minimum feasible kappa-star as the solution
@@ -1227,13 +1232,13 @@ def update_waypoints_function(xx, waypoints, current_waypoint_index):
 
 
 
-def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
+def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
                              initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), ell_star_figure8=False, use_multiple_waypoints=False, waypoints=None):
     """The state-reference governor simulation with Nonlinear dynamics
 
     Args:
         desired_state (vector): The target state
-        time_steps (float, optional): The time steps. Defaults to 0.0001.
+        time_steps (float, optional): The time steps. Defaults to 0.001.
         initial_state (vector, optional): The initial state. Defaults to np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).
 
     Returns:
@@ -1243,6 +1248,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
     # print(waypoints)
     x0 = initial_state
     desired_coord = None
+
     if not waypoints:
         desired_coord = np.array([desired_state[i]
                                 for i in [1, 3, 5, 11]]).reshape(-1, 1)
@@ -1253,17 +1259,18 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
     # Initial feasible control vk (a 4x1 vector)
     # (the first valid point along the line from A to B), this serves as the starting point
-    vk = 0.01 * desired_coord
+    vk = 0.001 * desired_coord
 
     # ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
     ell_star = 10000
     # make ell_star to be 100 when doing figure 8
     if ell_star_figure8:
-        ell_star = 1000
+        ell_star = 100
 
     # ime interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
-
+    # This is filled with 0.001, 0.002, 0.003 etc
+ 
     # Number of time steps for Euler’s method loop
     N = len(time_interval)
 
@@ -1286,14 +1293,13 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
     Dcl = np.zeros((C.shape[0], B.shape[1]))
 
     sys = ctrl.ss(Acl, Bcl, Ccl, Dcl)
-    sysd = ctrl.c2d(sys, time_steps)
+    sysd = ctrl.c2d(sys, 0.01)
 
     # The final discrete matrices to use in the closed-loop system
     Ad = sysd.A
     Bd = sysd.B
 
     # Constructing contraint matrices and constraint vector s
-    
     Hx = construct_Hx(S, Ad, ell_star)
     Hv = construct_Hv(S, Ad, Bd, ell_star)
     s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005]).T
@@ -1302,25 +1308,10 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
     I = np.eye(Ad.shape[0])
 
-    # Debug the sizes and inspect values
-    print("Debugging before adding steady-state constraints:")
-    print(f"Hx shape before: {Hx.shape}")
-    print(f"Hv shape before: {Hv.shape}")
-    print(f"h shape before: {h.shape}")
-    print(f"Ad shape: {Ad.shape}")
-    print(f"S shape: {S.shape}")
-    print(f"Bd shape: {Bd.shape}")
-
     # steady state constraints
     Hx = np.vstack((Hx, np.zeros((8, 16))))
     Hv = np.vstack((Hv, S @ np.linalg.inv(I - Ad) @ Bd))
     h = np.vstack([h, s * 0.99]) 
-
-    # Debug the sizes and inspect values
-    print("Debugging After adding steady-state constraints:")
-    print(f"Hx shape before: {Hx.shape}")
-    print(f"Hv shape before: {Hv.shape}")
-    print(f"h shape before: {h.shape}")
 
 
     # Initialize x array (evolving state over time)
@@ -1329,7 +1320,6 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
 
     # The control function for Euler simulation
-
     def qds_dt_nonlinear(x, target, vk):
         """Defines the change in state with non_linear dynamics
         Args:
@@ -1381,25 +1371,21 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
     # Main simulation loop for SRG Euler simulation
     # Sampling time for reference governor (ts1 > time_steps)
 
-    ts1 = 0.001
+    ts1 = 0.01
     controls = np.zeros((4, N))
     kappas = []
     current_waypoint_index =0
-    counter = 0
-
-    print("ts1: ", ts1)
-    print("timesteps: ", time_steps)
-    print(N)
-    print(desired_coord)
     vk_values = []
+
     for i in range(1, N):
 
-        t = (i - 1) * time_steps
+        t = round((i - 1) * time_steps, 6)
 
         if (t % ts1) < time_steps and i != 1:
+ 
 
             # here implement check to change waypoints/targetpoints
-            if use_multiple_waypoints and counter % 10 == 0:  # Execute every 10 iterations
+            if use_multiple_waypoints:  
                 desired_coord, current_waypoint_index = update_waypoints_function(xx[:, i - 1], waypoints, current_waypoint_index)
 
 
@@ -1410,7 +1396,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
             # Updating vk
             
             vk = vk + kappa * (desired_coord - vk)  
-
+        
         vk_values.append(vk)
 
         xx[12:, i] = xx[12:, i-1] + \
@@ -1422,7 +1408,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
             state_change[:12] * time_steps
 
         controls[:, i] = control.reshape(1, 4)[0]
-        counter+=1
+        
 
     return xx, controls, time_interval, kappas, vk_values
 
