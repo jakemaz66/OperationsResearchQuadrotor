@@ -1093,8 +1093,10 @@ def rg(Hx, Hv, h, desired_coord, vk, state, j):
     Returns:
         float: A kappa value
     """
+
     kappa_list = []
     j = min(j, h.shape[0] - 1)
+
 
     # Computing K*_j for each constraint inequality
     for i in range(h[j].shape[0]):
@@ -1103,24 +1105,24 @@ def rg(Hx, Hv, h, desired_coord, vk, state, j):
 
         Aj = Hv[j].T @ (desired_coord - vk)
 
+
         # add check here for bj ? Like he said in notes..?
         # Add check for Bj < 0
-        # if Bj < 0:
-        #     kappa = 0
-        #     kappa_list.append(kappa)
-        
+        if Bj < 0:
+            kappa = 0
+            kappa_list.append(kappa)
         # If Aj <= 0, we set kappa-star to 1
-        if Aj <= 0:
+        elif Aj <= 0:
             kappa = 1
             kappa_list.append(kappa)
-
         else:
-
             kappa = Bj / Aj
-
             # If kappa is infeasible
             if kappa < 0 or kappa > 1:
                 kappa = 0
+            
+            if kappa != 0:
+                print(kappa)
 
             kappa_list.append(kappa)
 
@@ -1128,12 +1130,7 @@ def rg(Hx, Hv, h, desired_coord, vk, state, j):
     return min(kappa_list)
 
 def calculate_control(curstate_integral):
-    """calculate control
-    Args:
-        curstate_integral (array): Current state 
-    Returns:
-        array: 1x4 control vector
-    """
+
     control = np.block([-K, Kc]) @ curstate_integral
     return control
 
@@ -1159,6 +1156,7 @@ def construct_Hx(S, Ad, ell_star):
     for ell in range(ell_star + 1):
         Ax = np.linalg.matrix_power(Ad, ell)
         Hx.append(S @ Ax)
+
 
     return np.vstack(Hx)
 
@@ -1198,18 +1196,6 @@ def construct_Hv(S, Ad, Bd, ell_star):
     return np.vstack(Hv)
 
 def update_waypoints_function(xx, waypoints, current_waypoint_index):
-    """
-    Update the desired waypoint based on the current state and proximity.
-
-    Args:
-        xx (array): Current state of the drone (xx[1] = x, xx[3] = y, xx[5] = z).
-        waypoints (list): List of waypoints to follow.
-        current_waypoint_index (int): Index of the current waypoint.
-
-    Returns:
-        new_desired_coord (array): Updated target waypoint (4x1 vector).
-        new_waypoint_index (int): Updated waypoint index.
-    """
 
     # Extract x, y, z from current state
     current_position = np.array([xx[1], xx[3], xx[5]])
@@ -1233,6 +1219,9 @@ def update_waypoints_function(xx, waypoints, current_waypoint_index):
         new_waypoint_index = current_waypoint_index
         new_desired_coord = np.array([waypoints[current_waypoint_index][i] for i in [1, 3, 5, 11]]).reshape(-1, 1)
 
+    # print(new_desired_coord)
+    # print(new_waypoint_index)
+
     return new_desired_coord, new_waypoint_index
 
 
@@ -1251,12 +1240,16 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
         Matrix: The state-matrix of the Euler simulation
     """
     print("In SRG Simulation_Nonlinear function")
-    print(waypoints)
+    # print(waypoints)
     x0 = initial_state
+    desired_coord = None
+    if not waypoints:
+        desired_coord = np.array([desired_state[i]
+                                for i in [1, 3, 5, 11]]).reshape(-1, 1)
+    else:
+        desired_coord = np.array([waypoints[0][i] for i in [1, 3, 5, 11]]).reshape(-1, 1)
 
-    # Transforming the desired (target) point into a 4x1 vector
-    desired_coord = np.array([desired_state[i]
-                             for i in [1, 3, 5, 11]]).reshape(-1, 1)
+
 
     # Initial feasible control vk (a 4x1 vector)
     # (the first valid point along the line from A to B), this serves as the starting point
@@ -1266,7 +1259,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
     ell_star = 10000
     # make ell_star to be 100 when doing figure 8
     if ell_star_figure8:
-        ell_star = 100
+        ell_star = 1000
 
     # ime interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
@@ -1300,11 +1293,35 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
     Bd = sysd.B
 
     # Constructing contraint matrices and constraint vector s
+    
     Hx = construct_Hx(S, Ad, ell_star)
     Hv = construct_Hv(S, Ad, Bd, ell_star)
     s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005]).T
     epsilon = 0.005
     h = construct_h(s, epsilon, ell_star)
+
+    I = np.eye(Ad.shape[0])
+
+    # Debug the sizes and inspect values
+    print("Debugging before adding steady-state constraints:")
+    print(f"Hx shape before: {Hx.shape}")
+    print(f"Hv shape before: {Hv.shape}")
+    print(f"h shape before: {h.shape}")
+    print(f"Ad shape: {Ad.shape}")
+    print(f"S shape: {S.shape}")
+    print(f"Bd shape: {Bd.shape}")
+
+    # steady state constraints
+    Hx = np.vstack((Hx, np.zeros((8, 16))))
+    Hv = np.vstack((Hv, S @ np.linalg.inv(I - Ad) @ Bd))
+    h = np.vstack([h, s * 0.99]) 
+
+    # Debug the sizes and inspect values
+    print("Debugging After adding steady-state constraints:")
+    print(f"Hx shape before: {Hx.shape}")
+    print(f"Hv shape before: {Hv.shape}")
+    print(f"h shape before: {h.shape}")
+
 
     # Initialize x array (evolving state over time)
     xx = np.zeros((16, N))
@@ -1324,13 +1341,14 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
         u, Px, v, Py, w, Pz, p, phi, q, theta, r, psi, i1, i2, i3, i4 = x
 
+
         control = calculate_control(x)
 
         # Updating integral states
         error = target.reshape(1, 4)[0] - vk.reshape(1, 4)[0]
         x[12:] = error
 
-        F0 = control[0] + Mq * g
+        F0 = control[0] #+ Mq * g
         TauPhi = control[1]     # Roll torque
         TauTheta = control[2]   # Pitch torque
         TauPsi = control[3]     # Yaw Torque
@@ -1362,38 +1380,38 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
     # Main simulation loop for SRG Euler simulation
     # Sampling time for reference governor (ts1 > time_steps)
-    # Maxi thinks ts1 < timesteps ??
-    ts1 = 0.001
 
+    ts1 = 0.001
     controls = np.zeros((4, N))
     kappas = []
     current_waypoint_index =0
-    print(N)
     counter = 0
+
+    print("ts1: ", ts1)
+    print("timesteps: ", time_steps)
+    print(N)
+    print(desired_coord)
+    vk_values = []
     for i in range(1, N):
 
         t = (i - 1) * time_steps
 
         if (t % ts1) < time_steps and i != 1:
-            # print(i)
-            # print(use_multiple_waypoints and counter%10 ==0)
 
             # here implement check to change waypoints/targetpoints
             if use_multiple_waypoints and counter % 10 == 0:  # Execute every 10 iterations
-                # print("HERE")
-                # print(f"Iteration {i}: Checking and updating waypoints/target points.")
-                # Example of waypoint update (you can replace this with your logic)
-                # print(desired_coord, " before calling update_waypoints_function")
                 desired_coord, current_waypoint_index = update_waypoints_function(xx[:, i - 1], waypoints, current_waypoint_index)
-                # print(desired_coord, " after calling update_waypoints_function")
+
 
             # Getting kappa_t solution from reference governor
             # We select the minimum feasible kappa-star as the solution
             kappa = min(rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1), 1)
             kappas.append(kappa)
-
             # Updating vk
-            vk = vk + kappa * (desired_coord - vk)
+            
+            vk = vk + kappa * (desired_coord - vk)  
+
+        vk_values.append(vk)
 
         xx[12:, i] = xx[12:, i-1] + \
             (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
@@ -1406,96 +1424,42 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
         controls[:, i] = control.reshape(1, 4)[0]
         counter+=1
 
+    return xx, controls, time_interval, kappas, vk_values
 
-
-
-    return xx, controls, time_interval, kappas
-
-
-
-
-def simulate_figure8_srg_max():
+def plot_vk_values(time_interval, vk_values):
     """
-    THIS function just sends the drone to each point after each other. There is no threshhold used- distance or alike
+    Plots the evolution of vk components over time.
+
+    Args:
+        time_interval (Vector): A vector of time steps.
+        vk_values (Matrix): A matrix where each row represents a vk vector at a specific time step.
     """
-    # Define figure-8 waypoints
-    waypoints = [
-        [0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # Waypoint 1: Move to Z=5
-        [2.5, 0.0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    ]
 
+    # Ensure vk_values is a NumPy array
+    vk_values = np.array(vk_values)
 
-    # Initial state for simulation
-    initial_state = np.array([0] * 16)
+    # Align dimensions by slicing time_interval
+    if len(time_interval) > len(vk_values):
+        time_interval = time_interval[:len(vk_values)]
 
-    # Initialize storage for results
-    all_states = []
-    all_controls = []
-    kappas = []
+    # Plotting vk components
+    fig = plt.figure(figsize=(12, 10))
+    fig.suptitle("Evolution of $v_k$ Components Over Time")
 
-    for target_state in waypoints:
-        print(f"Moving to target: {target_state}")
-        distance = float('inf')
-        trajectory_states = []
-        controls = []
-        kappas_local = []
+    # Plot each component of vk
+    for i in range(vk_values.shape[1]):  # vk_values.shape[1] = number of vk components
+        ax = fig.add_subplot(2, 2, i + 1)
+        ax.plot(time_interval, vk_values[:, i], label=f'$v_k[{i}]$', color=plt.cm.viridis(i / vk_values.shape[1]))
+        ax.set_title(f'$v_k[{i}]$ Over Time')
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel(f'$v_k[{i}]$ Value')
+        ax.legend()
+        ax.grid()
 
-        # Simulate until the drone is close enough to the waypoint
-
-
-        # while distance > 0.1:  # Adjust threshold if needed
-
-        xx, ctrl, time_interval, kappa = SRG_Simulation_Nonlinear(
-            desired_state=target_state,
-            initial_state=initial_state,
-            ell_star_figure8=True,
-        )
-
-        # Append trajectory and controls
-        trajectory_states.append(xx)
-        controls.append(ctrl)
-        kappas_local.extend(kappa)
-
-        # Calculate distance to the target
-        drone_pos = xx[[1, 3, 5], -1]  # Get last [x, y, z] from trajectory
-        target_pos = np.array(target_state[:3])  # Target [x, y, z]
-        print(f"Drone x position: {drone_pos[0]:.2f}, y position: {drone_pos[1]:.2f}")
-
-        # Calculate distance to the target using sqrt((dx)^2 + (dy)^2)
-        delta_x = drone_pos[0] - target_pos[0]  # Difference in x positions
-        delta_y = drone_pos[1] - target_pos[1]  # Difference in y positions
-        distance = np.sqrt(delta_x**2 + delta_y**2)  # Euclidean distance
-
-        # Update initial state for the next iteration
-        initial_state = xx[:, -1]  # Use the last state as the new initial state
-
-        # Store results after reaching the waypoint
-        all_states.append(np.hstack(trajectory_states))
-        all_controls.append(np.hstack(controls))
-        kappas.extend(kappas_local)
-
-    # Concatenate all trajectories
-    all_states = np.hstack(all_states)
-    all_controls = np.hstack(all_controls)
-
-    # Plotting the trajectory
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-
-    ax.plot(all_states[1, :], all_states[3, :], all_states[5, :], label="Drone Path")
-    ax.scatter(
-        [waypoint[0] for waypoint in waypoints],
-        [waypoint[1] for waypoint in waypoints],
-        [waypoint[2] for waypoint in waypoints],
-        color='r', label="Waypoints"
-    )
-
-    ax.set_xlabel("X Position")
-    ax.set_ylabel("Y Position")
-    ax.set_zlabel("Z Position")
-    ax.set_title("Figure-8 Trajectory")
-    ax.legend()
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to fit the title
     plt.show()
+
+
 
 
 if __name__ == '__main__':
@@ -1510,7 +1474,7 @@ if __name__ == '__main__':
         0, 0]     # angular velocity and position psi ]
 
     target_state_16 = [
-        0, 10,   # velocity and position on x
+        0, 0,   # velocity and position on x
         0, 10,    # velocity and position on y
         0, 10,    # velocity and position on z
         0, 0,     # angular velocity and position thi
@@ -1527,8 +1491,9 @@ if __name__ == '__main__':
     
 # ----------------------------------------------------------------
 
-    # xx, controls, time_interval, kappas= SRG_Simulation_Linear(desired_state=target_state_16)
-    # xx, controls, time_interval, kappas = SRG_Simulation_Nonlinear(desired_state=target_state_16)
+    # # # xx, controls, time_interval, kappas= SRG_Simulation_Linear(desired_state=target_state_16)
+    # xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16)
+    # plot_vk_values(time_interval, vk_values)
     
     # plot_SRG_simulation(time_interval, xx,
     #                     target_state=target_state_16, kappas=kappas)
@@ -1539,12 +1504,12 @@ if __name__ == '__main__':
 
 
     waypoints1 = [
-        [0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 5, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 6, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 6, 0, 3, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 6, 0, 5, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 6, 0, 5, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        [0, 0, 0, 10, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 10, 0, 10, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        # [0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        # [0, 4, 0, 3, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        # [0, 4, 0, 5, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        # [0, 4, 0, 7, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     ]
 
 
@@ -1552,13 +1517,21 @@ if __name__ == '__main__':
 # double chekc if SRG_Simulation_NOnlinear before adding waypoints still works
 
 
-    xx, controls, time_interval, kappas = SRG_Simulation_Nonlinear(desired_state=target_state_16, ell_star_figure8=True, use_multiple_waypoints=True, waypoints=waypoints1)
+    xx, controls, time_interval, kappas,vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16, ell_star_figure8=True, use_multiple_waypoints=True, waypoints=waypoints1)
+    plot_vk_values(time_interval*2, vk_values)
 
-    plot_SRG_simulation(time_interval, xx,
+    plot_SRG_simulation(time_interval*2, xx,
                         target_state=target_state_16, kappas=kappas)
+
+    plot_SRG_controls(time_interval*2, controls, target_state)
     
-# def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
-#                              initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), ell_star_figure8=False, use_multiple_waypoints=False, waypoints=None):
+
+
+
+
+
+
+
 
 
 
