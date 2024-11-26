@@ -846,41 +846,41 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
 
     # Change in X over time
     ax1 = fig.add_subplot(3, 2, 1)
-    ax1.plot(time_interval, xx[1, :], label='X Change')
+    ax1.plot( xx[1, :], label='X Change')
     ax1.set_title('Change in X')
     ax1.set_xlabel('Time')
     ax1.set_ylabel('X Position')
 
     # Change in Y over time
     ax2 = fig.add_subplot(3, 2, 2)
-    ax2.plot(time_interval, xx[3, :], label='Y Change', color='orange')
+    ax2.plot( xx[3, :], label='Y Change', color='orange')
     ax2.set_title('Change in Y')
     ax2.set_xlabel('Time')
     ax2.set_ylabel('Y Position')
 
     # Change in Z over time
     ax3 = fig.add_subplot(3, 2, 3)
-    ax3.plot(time_interval, xx[5, :], label='Z Change', color='green')
+    ax3.plot( xx[5, :], label='Z Change', color='green')
     ax3.set_title('Change in Z')
     ax3.set_xlabel('Time')
     ax3.set_ylabel('Z Position')
 
-    # 3D plot of X, Y, Z states
-    ax4 = fig.add_subplot(3, 2, 4, projection='3d')
-    ax4.plot(xx[1, :], xx[3, :], xx[5, :],
-             label='3D Trajectory', color='purple')
-    ax4.set_title('3D State Trajectory')
-    ax4.set_xlabel('X Position')
-    ax4.set_ylabel('Y Position')
-    ax4.set_zlabel('Z Position')
+    # # 3D plot of X, Y, Z states
+    # ax4 = fig.add_subplot(3, 2, 4, projection='3d')
+    # ax4.plot(xx[1, :], xx[3, :], xx[5, :],
+    #          label='3D Trajectory', color='purple')
+    # ax4.set_title('3D State Trajectory')
+    # ax4.set_xlabel('X Position')
+    # ax4.set_ylabel('Y Position')
+    # ax4.set_zlabel('Z Position')
 
-    # Kappas over time
-    ax5 = fig.add_subplot(3, 1, 3)
-    ax5.plot(time_interval[::10], kappas[:len(
-        time_interval[::10])], label='Kappas', color='red')
-    ax5.set_title('Kappas over Time')
-    ax5.set_xlabel('Time')
-    ax5.set_ylabel('Kappa Value')
+    # # Kappas over time
+    # ax5 = fig.add_subplot(3, 1, 3)
+    # ax5.plot(time_interval[::10], kappas[:len(
+    #     time_interval[::10])], label='Kappas', color='red')
+    # ax5.set_title('Kappas over Time')
+    # ax5.set_xlabel('Time')
+    # ax5.set_ylabel('Kappa Value')
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to fit the title
     plt.show()
@@ -936,24 +936,27 @@ def plot_SRG_controls(time_interval, controls, target_state):
     plt.tight_layout()
     plt.show()
 
-def construct_h(s, epsilon, ell_star):
-    """Construct the contraint matrix h
+# def construct_h(s, epsilon, ell_star):
+#     """Construct the contraint matrix h
 
-    Args:
-        s (vector): The constraint vector
-        epsilon (float): A small positive number
-        ell_star (int): number of iterations (timesteps)
+#     Args:
+#         s (vector): The constraint vector
+#         epsilon (float): A small positive number
+#         ell_star (int): number of iterations (timesteps)
 
-    Returns:
-        matrix: The constraint matrix h
-    """
+#     Returns:
+#         matrix: The constraint matrix h
+#     """
 
-    h = [s] * ell_star
+#     s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005])
 
-    # Last element is s - epsilon (epsilon is small positive number)
-    h.append(s - epsilon)
 
-    return np.array(h)
+#     h = [s] * ell_star
+
+#     # Last element is s - epsilon (epsilon is small positive number)
+#     h.append(s - epsilon)
+
+#     return np.array(h)
 
 def SRG_Simulation_Linear(desired_state, time_steps=0.001,
                           initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
@@ -1082,62 +1085,91 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
 
     # Reference governor computation
 
-def rg(Hx, Hv, h, desired_coord, vk, state, j):
-    """The scalar reference governor returns a scalar values (one) representing the maximum feasible step
-        toward the desired coordinates.
+# def rg(Hx, Hv, h, desired_coord, vk, state, j):
+#     """The scalar reference governor returns a scalar values (one) representing the maximum feasible step
+#         toward the desired coordinates.
 
-    Args:
-        Hx (matrix): A constraint matrix
-        Hv (matrix): A constraint matrix
-        h (matrix): A constraint matrix
-        desired_coord (vector): The desired coordinates for the quadrotor
-        vk (vector): The control
-        state (vector): The current state
-        j (int): An index for the simulation loop
+#     Args:
+#         Hx (matrix): A constraint matrix
+#         Hv (matrix): A constraint matrix
+#         h (matrix): A constraint matrix
+#         desired_coord (vector): The desired coordinates for the quadrotor
+#         vk (vector): The control
+#         state (vector): The current state
+#         j (int): An index for the simulation loop
 
-    Returns:
-        float: A kappa value
-    """
+#     Returns:
+#         float: A kappa value
+#     """
 
-    kappa_list = []
-    j = min(j, h.shape[0] - 1)
+#     kappa_list = []
+#     j = min(j, h.shape[0] - 1)
+#     print(j)
+#     print(h[j].shape[0])
 
 
-    # Computing K*_j for each constraint inequality
-    for i in range(h[j].shape[0]):
+#     # Computing K*_j for each constraint inequality
+#     for i in range(h[j].shape[0]):
+        
+#         Bj = h[j][i] - (Hx[j] @ state) - (Hv[j] @ vk)
 
-        Bj = h[j][i] - (Hx[j] @ state) - (Hv[j] @ vk)
+#         Aj = Hv[j].T @ (desired_coord - vk)
+#         print(Aj)
+#         exit()
 
-        Aj = Hv[j].T @ (desired_coord - vk)
-
-        # Add check for Bj < 0
-        if Bj < 0:
-            kappa = 0
-            kappa_list.append(kappa)
-        # If Aj <= 0, we set kappa-star to 1
-        elif Aj <= 0:
-            kappa = 1
-            kappa_list.append(kappa)
-        else:
-            kappa = Bj / Aj
-            # If kappa is infeasible
-            if kappa < 0 or kappa > 1:
-                kappa = 0
+#         # Add check for Bj < 0
+#         if Bj < 0:
+#             kappa = 0
+#             kappa_list.append(kappa)
+#         # If Aj <= 0, we set kappa-star to 1
+#         elif Aj <= 0:
+#             kappa = 1
+#             kappa_list.append(kappa)
+#         else:
+#             kappa = Bj / Aj
+#             # If kappa is infeasible
+#             if kappa < 0 or kappa > 1:
+#                 kappa = 0
             
-            if kappa != 0:
-                print(kappa)
+#             if kappa != 0:
+#                 print(kappa)
 
-            kappa_list.append(kappa)
+#             kappa_list.append(kappa)
 
-    # Min kappa-star out of the 8 inequalities is optimal solution
-    return min(kappa_list)
+#     # Min kappa-star out of the 8 inequalities is optimal solution
+#     return min(kappa_list)
+
+
+def rg(Hx, Hv, h, r, vk, xx):
+    M = Hx.shape[0]
+    k = np.zeros(M)
+
+    for j in range(M):
+
+        alpha = Hv[j, :]@ (r - vk)        
+        beta = h[j] - Hx[j, :] @ xx - Hv[j, :] @ vk
+        # print(Hx[j, :])
+        # print("hj: ", h[j])
+        # print("xx: ", xx)
+        # print("vk: ", vk)
+        # print("beta: ", beta)
+        # print("h: ", h.shape)
+    
+        if alpha > 0:
+            k[j] = beta / alpha
+        else:
+            k[j] = 1
+        if beta < 0:
+            k[j] = 0
+        # print('negative')
+        kappa = min(k)
+    return kappa
 
 def calculate_control(curstate_integral):
 
     control = np.block([-K, Kc]) @ curstate_integral
     return control
 
-    # This function constructs the constraint matrix Hx (which places constraints on states)
 
 
 def construct_Hx(S, Ad, ell_star):
@@ -1230,40 +1262,24 @@ def update_waypoints_function(xx, waypoints, current_waypoint_index):
 
 
 
-def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
+def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
                              initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), ell_star_figure8=False, use_multiple_waypoints=False, waypoints=None):
-    """The state-reference governor simulation with Nonlinear dynamics
 
-    Args:
-        desired_state (vector): The target state
-        time_steps (float, optional): The time steps. Defaults to 0.001.
-        initial_state (vector, optional): The initial state. Defaults to np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).
-
-    Returns:
-        Matrix: The state-matrix of the Euler simulation
-    """
     print("In SRG Simulation_Nonlinear function")
-    # print(waypoints)
     x0 = initial_state
     desired_coord = None
 
-    if not waypoints:
-        desired_coord = np.array([desired_state[i]
-                                for i in [1, 3, 5, 11]]).reshape(-1, 1)
-    else:
-        desired_coord = np.array([waypoints[0][i] for i in [1, 3, 5, 11]]).reshape(-1, 1)
 
-
+    desired_coord = np.zeros(4)
+    desired_coord[0] = desired_state[1]
+    desired_coord[1] = desired_state[3]
+    desired_coord[2] = desired_state[5]
+    desired_coord[3] = desired_state[11]
+       
 
     # Initial feasible control vk (a 4x1 vector)
     # (the first valid point along the line from A to B), this serves as the starting point
-    vk = 0.001 * desired_coord
-
-    # ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
-    ell_star = 10000
-    # make ell_star to be 100 when doing figure 8
-    if ell_star_figure8:
-        ell_star = 100
+    vk = 0.01 * desired_coord
 
     # ime interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
@@ -1291,25 +1307,31 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     Dcl = np.zeros((C.shape[0], B.shape[1]))
 
     sys = ctrl.ss(Acl, Bcl, Ccl, Dcl)
-    sysd = ctrl.c2d(sys, 0.01)
+    sysd = ctrl.c2d(sys, 0.001)
 
     # The final discrete matrices to use in the closed-loop system
     Ad = sysd.A
     Bd = sysd.B
 
-    # Constructing contraint matrices and constraint vector s
-    Hx = construct_Hx(S, Ad, ell_star)
-    Hv = construct_Hv(S, Ad, Bd, ell_star)
-    s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005]).T
-    epsilon = 0.005
-    h = construct_h(s, epsilon, ell_star)
+    # Reference Governor Initialization
+    # lstar should be 1000 as from prof code
+    lstar = 1000
+    I = np.eye(16)
+    Hx = []
+    Hv = []
+    h = []
+    s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005])
+    S = np.block([[-K, Kc], [K, -Kc]] )
 
-    I = np.eye(Ad.shape[0])
+    # Build Hx, Hv, and h matrices
+    for l in range(1, lstar + 1):
+        Hx.append(S @ np.linalg.matrix_power(Ad, l))
+        Hv.append(S @ np.linalg.inv(I - Ad) @ (I - np.linalg.matrix_power(Ad, l)) @ Bd)
+        h.append(s)
 
-    # steady state constraints
-    Hx = np.vstack((Hx, np.zeros((8, 16))))
-    Hv = np.vstack((Hv, S @ np.linalg.inv(I - Ad) @ Bd))
-    h = np.vstack([h, s * 0.99]) 
+    Hx = np.vstack(Hx + [np.zeros((8, 16))])
+    Hv = np.vstack(Hv + [S @ np.linalg.inv(I - Ad) @ Bd])
+    h = np.hstack(h + [s * 0.99])
 
 
     # Initialize x array (evolving state over time)
@@ -1329,12 +1351,10 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
 
         u, Px, v, Py, w, Pz, p, phi, q, theta, r, psi, i1, i2, i3, i4 = x
 
-
         control = calculate_control(x)
 
         # Updating integral states
-        error = target.reshape(1, 4)[0] - vk.reshape(1, 4)[0]
-        x[12:] = error
+        error = np.array([vk[0] - x[1], vk[1] - x[3], vk[2] - x[5], vk[3] - x[11]])
 
         F0 = control[0] #+ Mq * g
         TauPhi = control[1]     # Roll torque
@@ -1369,94 +1389,39 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     # Main simulation loop for SRG Euler simulation
     # Sampling time for reference governor (ts1 > time_steps)
 
-    ts1 = 0.01
+    ts1 = 0.001
     controls = np.zeros((4, N))
     kappas = []
-    current_waypoint_index =0
     vk_values = []
     x_old = None
     xc = np.zeros(4)
+    vk = [1,1,1,0]
     
     for i in range(1, N):
 
         t = round((i - 1) * time_steps, 6)
 
-        if (t % ts1) < time_steps and i != 1:
+        if (t % ts1) < time_steps and i != 1:            
 
-            
-            # Implement check to change waypoints/targetpoints
-            if use_multiple_waypoints:  
-                desired_coord, current_waypoint_index = update_waypoints_function(xx[:, i - 1], waypoints, current_waypoint_index)
-            print("here: ", x_old)
-            if x_old is not None:
+            if x_old is not None:       
                 
-                kappa = min(rg(Hx, Hv, h, desired_coord, vk, x_old, i-1), 1)
+                kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
                 kappas.append(kappa)
-                
-                # Updating vk
+            
                 vk = vk + kappa * (desired_coord - vk)  
 
-            
-            print("xc: " ,xc)
-            print(" ")
-            print(x_old)
-            x_old=np.block([xx[:, i-1], xc]) 
-            print(x_old)
-            exit()
-
-
-        xc = xx[12:, i -1 ]
+            x_old=np.block([xx[:, i-1]]) 
 
         vk_values.append(vk)
-        
-        # Update states and control variables
-        xx[12:, i] = xx[12:, i-1] + \
-            (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
 
         state_change, control = qds_dt_nonlinear(xx[:, i-1], desired_coord, vk)
 
-        xx[:12, i] = xx[:12, i-1] + \
-            state_change[:12] * time_steps
+        xx[:, i] = xx[:, i-1] + state_change * time_steps
 
         controls[:, i] = control.reshape(1, 4)[0]
         
     return xx, controls, time_interval, kappas, vk_values
 
-
-    # for i in range(1, N):
-
-    #     t = round((i - 1) * time_steps, 6)
-
-    #     if (t % ts1) < time_steps and i != 1:
- 
-
-    #         # here implement check to change waypoints/targetpoints
-    #         if use_multiple_waypoints:  
-    #             desired_coord, current_waypoint_index = update_waypoints_function(xx[:, i - 1], waypoints, current_waypoint_index)
-
-
-    #         # Getting kappa_t solution from reference governor
-    #         # We select the minimum feasible kappa-star as the solution
-    #         kappa = min(rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1), 1)
-    #         kappas.append(kappa)
-    #         # Updating vk
-            
-    #         vk = vk + kappa * (desired_coord - vk)  
-        
-    #     vk_values.append(vk)
-
-    #     xx[12:, i] = xx[12:, i-1] + \
-    #         (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
-
-    #     state_change, control = qds_dt_nonlinear(xx[:, i-1], desired_coord, vk)
-
-    #     xx[:12, i] = xx[:12, i-1] + \
-    #         state_change[:12] * time_steps
-
-    #     controls[:, i] = control.reshape(1, 4)[0]
-        
-
-    # return xx, controls, time_interval, kappas, vk_values
 
 def plot_vk_values(time_interval, vk_values):
     """
@@ -1507,8 +1472,8 @@ if __name__ == '__main__':
 
     target_state_16 = [
         0, 0,   # velocity and position on x
-        0, 10,    # velocity and position on y
-        0, 10,    # velocity and position on z
+        0, 1,    # velocity and position on y
+        0, 1,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0,     # angular velocity and position psi ]
@@ -1523,14 +1488,14 @@ if __name__ == '__main__':
     
 # ----------------------------------------------------------------
 
-    # # # xx, controls, time_interval, kappas= SRG_Simulation_Linear(desired_state=target_state_16)
-    # xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16)
-    # plot_vk_values(time_interval, vk_values)
+    # # xx, controls, time_interval, kappas= SRG_Simulation_Linear(desired_state=target_state_16)
+    xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16)
+    plot_vk_values(time_interval, vk_values)
     
-    # plot_SRG_simulation(time_interval, xx,
-    #                     target_state=target_state_16, kappas=kappas)
+    plot_SRG_simulation(time_interval, xx,
+                        target_state=target_state_16, kappas=kappas)
     
-    # plot_SRG_controls(time_interval, controls, target_state)
+    plot_SRG_controls(time_interval, controls, target_state)
 # ------------------------------------------------------------------
 
 
@@ -1549,13 +1514,13 @@ if __name__ == '__main__':
 # double chekc if SRG_Simulation_NOnlinear before adding waypoints still works
 
 
-    xx, controls, time_interval, kappas,vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16, ell_star_figure8=True, use_multiple_waypoints=True, waypoints=waypoints1)
-    plot_vk_values(time_interval*2, vk_values)
+    # xx, controls, time_interval, kappas,vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16, ell_star_figure8=True, use_multiple_waypoints=True, waypoints=waypoints1)
+    # plot_vk_values(time_interval*2, vk_values)
 
-    plot_SRG_simulation(time_interval*2, xx,
-                        target_state=target_state_16, kappas=kappas)
+    # plot_SRG_simulation(time_interval*2, xx,
+    #                     target_state=target_state_16, kappas=kappas)
 
-    plot_SRG_controls(time_interval*2, controls, target_state)
+    # plot_SRG_controls(time_interval*2, controls, target_state)
     
 
 
