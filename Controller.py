@@ -1110,8 +1110,6 @@ def rg(Hx, Hv, h, desired_coord, vk, state, j):
 
         Aj = Hv[j].T @ (desired_coord - vk)
 
-
-        # add check here for bj ? Like he said in notes..?
         # Add check for Bj < 0
         if Bj < 0:
             kappa = 0
@@ -1376,29 +1374,42 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     kappas = []
     current_waypoint_index =0
     vk_values = []
-
+    x_old = None
+    xc = np.zeros(4)
+    
     for i in range(1, N):
 
         t = round((i - 1) * time_steps, 6)
 
         if (t % ts1) < time_steps and i != 1:
- 
 
-            # here implement check to change waypoints/targetpoints
+            
+            # Implement check to change waypoints/targetpoints
             if use_multiple_waypoints:  
                 desired_coord, current_waypoint_index = update_waypoints_function(xx[:, i - 1], waypoints, current_waypoint_index)
+            print("here: ", x_old)
+            if x_old is not None:
+                
+                kappa = min(rg(Hx, Hv, h, desired_coord, vk, x_old, i-1), 1)
+                kappas.append(kappa)
+                
+                # Updating vk
+                vk = vk + kappa * (desired_coord - vk)  
 
-
-            # Getting kappa_t solution from reference governor
-            # We select the minimum feasible kappa-star as the solution
-            kappa = min(rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1), 1)
-            kappas.append(kappa)
-            # Updating vk
             
-            vk = vk + kappa * (desired_coord - vk)  
-        
-        vk_values.append(vk)
+            print("xc: " ,xc)
+            print(" ")
+            print(x_old)
+            x_old=np.block([xx[:, i-1], xc]) 
+            print(x_old)
+            exit()
 
+
+        xc = xx[12:, i -1 ]
+
+        vk_values.append(vk)
+        
+        # Update states and control variables
         xx[12:, i] = xx[12:, i-1] + \
             (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
 
@@ -1409,8 +1420,43 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
 
         controls[:, i] = control.reshape(1, 4)[0]
         
-
     return xx, controls, time_interval, kappas, vk_values
+
+
+    # for i in range(1, N):
+
+    #     t = round((i - 1) * time_steps, 6)
+
+    #     if (t % ts1) < time_steps and i != 1:
+ 
+
+    #         # here implement check to change waypoints/targetpoints
+    #         if use_multiple_waypoints:  
+    #             desired_coord, current_waypoint_index = update_waypoints_function(xx[:, i - 1], waypoints, current_waypoint_index)
+
+
+    #         # Getting kappa_t solution from reference governor
+    #         # We select the minimum feasible kappa-star as the solution
+    #         kappa = min(rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1), 1)
+    #         kappas.append(kappa)
+    #         # Updating vk
+            
+    #         vk = vk + kappa * (desired_coord - vk)  
+        
+    #     vk_values.append(vk)
+
+    #     xx[12:, i] = xx[12:, i-1] + \
+    #         (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
+
+    #     state_change, control = qds_dt_nonlinear(xx[:, i-1], desired_coord, vk)
+
+    #     xx[:12, i] = xx[:12, i-1] + \
+    #         state_change[:12] * time_steps
+
+    #     controls[:, i] = control.reshape(1, 4)[0]
+        
+
+    # return xx, controls, time_interval, kappas, vk_values
 
 def plot_vk_values(time_interval, vk_values):
     """
