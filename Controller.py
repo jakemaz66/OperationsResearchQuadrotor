@@ -1279,7 +1279,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
     # Initial feasible control vk (a 4x1 vector)
     # (the first valid point along the line from A to B), this serves as the starting point
-    vk = 0.01 * desired_coord
+    vk = 0.001 * desired_coord
 
     # ime interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
@@ -1307,7 +1307,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
     Dcl = np.zeros((C.shape[0], B.shape[1]))
 
     sys = ctrl.ss(Acl, Bcl, Ccl, Dcl)
-    sysd = ctrl.c2d(sys, 0.001)
+    sysd = ctrl.c2d(sys, 0.01)
 
     # The final discrete matrices to use in the closed-loop system
     Ad = sysd.A
@@ -1388,36 +1388,30 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
     # Main simulation loop for SRG Euler simulation
     # Sampling time for reference governor (ts1 > time_steps)
-
-    ts1 = 0.001
+    ts1 = 0.01
     controls = np.zeros((4, N))
     kappas = []
     vk_values = []
     x_old = None
-    xc = np.zeros(4)
-    vk = [1,1,1,0]
-    
+
+
     for i in range(1, N):
 
         t = round((i - 1) * time_steps, 6)
 
         if (t % ts1) < time_steps and i != 1:            
 
-            if x_old is not None:       
+            if x_old is not None:      
                 
                 kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
-                kappas.append(kappa)
-            
+                kappas.append(kappa)            
                 vk = vk + kappa * (desired_coord - vk)  
 
             x_old=np.block([xx[:, i-1]]) 
 
         vk_values.append(vk)
-
         state_change, control = qds_dt_nonlinear(xx[:, i-1], desired_coord, vk)
-
         xx[:, i] = xx[:, i-1] + state_change * time_steps
-
         controls[:, i] = control.reshape(1, 4)[0]
         
     return xx, controls, time_interval, kappas, vk_values
@@ -1472,8 +1466,8 @@ if __name__ == '__main__':
 
     target_state_16 = [
         0, 0,   # velocity and position on x
-        0, 1,    # velocity and position on y
-        0, 1,    # velocity and position on z
+        0, 10,    # velocity and position on y
+        0, 10,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0,     # angular velocity and position psi ]
@@ -1490,7 +1484,8 @@ if __name__ == '__main__':
 
     # # xx, controls, time_interval, kappas= SRG_Simulation_Linear(desired_state=target_state_16)
     xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16)
-    plot_vk_values(time_interval, vk_values)
+    print("DOne")
+    # plot_vk_values(time_interval, vk_values)
     
     plot_SRG_simulation(time_interval, xx,
                         target_state=target_state_16, kappas=kappas)
@@ -1522,8 +1517,6 @@ if __name__ == '__main__':
 
     # plot_SRG_controls(time_interval*2, controls, target_state)
     
-
-
 
 
 
