@@ -17,12 +17,13 @@ R = 0.0503513
 Mprop = 0.00311
 #Mass of motor + propellor
 Mm = 0.036 + Mprop
-#Moment of inertia for x direction
-Jx = ((2 * Ms * R**2) / 5) + (2 * L**2 * Mm)
+#Moment of intertia for x direction
+Jx = ((2 * Ms * R) / 5) + (2 * L**2 * Mm)
 #Moment of inertia for y direction
-Jy = ((2 * Ms * R**2) / 5) + (2 * L**2 * Mm)
+Jy = ((2 * Ms * R) / 5) + (2 * L**2 * Mm)
 #Moment of inertia for z direction
-Jz = ((2 * Ms * R**2) / 5) + (4 * L**2 * Mm)
+Jz = ((2 * Ms * R) / 5) + (4 * L**2 * Mm)
+
 m = Mq
 # A is a 12x12 matrix used for linear simulation (given in slide 35, lecture 3)
 A = np.array([

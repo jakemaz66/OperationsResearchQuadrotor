@@ -936,27 +936,7 @@ def plot_SRG_controls(time_interval, controls, target_state):
     plt.tight_layout()
     plt.show()
 
-# def construct_h(s, epsilon, ell_star):
-#     """Construct the contraint matrix h
 
-#     Args:
-#         s (vector): The constraint vector
-#         epsilon (float): A small positive number
-#         ell_star (int): number of iterations (timesteps)
-
-#     Returns:
-#         matrix: The constraint matrix h
-#     """
-
-#     s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005])
-
-
-#     h = [s] * ell_star
-
-#     # Last element is s - epsilon (epsilon is small positive number)
-#     h.append(s - epsilon)
-
-#     return np.array(h)
 
 def SRG_Simulation_Linear(desired_state, time_steps=0.001,
                           initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
@@ -1083,61 +1063,7 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
 
     return xx, controls, time_interval, np.array(kappas)
 
-    # Reference governor computation
 
-# def rg(Hx, Hv, h, desired_coord, vk, state, j):
-#     """The scalar reference governor returns a scalar values (one) representing the maximum feasible step
-#         toward the desired coordinates.
-
-#     Args:
-#         Hx (matrix): A constraint matrix
-#         Hv (matrix): A constraint matrix
-#         h (matrix): A constraint matrix
-#         desired_coord (vector): The desired coordinates for the quadrotor
-#         vk (vector): The control
-#         state (vector): The current state
-#         j (int): An index for the simulation loop
-
-#     Returns:
-#         float: A kappa value
-#     """
-
-#     kappa_list = []
-#     j = min(j, h.shape[0] - 1)
-#     print(j)
-#     print(h[j].shape[0])
-
-
-#     # Computing K*_j for each constraint inequality
-#     for i in range(h[j].shape[0]):
-        
-#         Bj = h[j][i] - (Hx[j] @ state) - (Hv[j] @ vk)
-
-#         Aj = Hv[j].T @ (desired_coord - vk)
-#         print(Aj)
-#         exit()
-
-#         # Add check for Bj < 0
-#         if Bj < 0:
-#             kappa = 0
-#             kappa_list.append(kappa)
-#         # If Aj <= 0, we set kappa-star to 1
-#         elif Aj <= 0:
-#             kappa = 1
-#             kappa_list.append(kappa)
-#         else:
-#             kappa = Bj / Aj
-#             # If kappa is infeasible
-#             if kappa < 0 or kappa > 1:
-#                 kappa = 0
-            
-#             if kappa != 0:
-#                 print(kappa)
-
-#             kappa_list.append(kappa)
-
-#     # Min kappa-star out of the 8 inequalities is optimal solution
-#     return min(kappa_list)
 
 
 def rg(Hx, Hv, h, r, vk, xx):
@@ -1148,12 +1074,6 @@ def rg(Hx, Hv, h, r, vk, xx):
 
         alpha = Hv[j, :]@ (r - vk)        
         beta = h[j] - Hx[j, :] @ xx - Hv[j, :] @ vk
-        # print(Hx[j, :])
-        # print("hj: ", h[j])
-        # print("xx: ", xx)
-        # print("vk: ", vk)
-        # print("beta: ", beta)
-        # print("h: ", h.shape)
     
         if alpha > 0:
             k[j] = beta / alpha
@@ -1161,7 +1081,7 @@ def rg(Hx, Hv, h, r, vk, xx):
             k[j] = 1
         if beta < 0:
             k[j] = 0
-        # print('negative')
+        
         kappa = min(k)
     return kappa
 
@@ -1256,7 +1176,7 @@ def update_waypoints_function(xx, waypoints, current_waypoint_index):
     return new_desired_coord, new_waypoint_index
 
 
-def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
+def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
                              initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), ell_star_figure8=False, use_multiple_waypoints=False, waypoints=None):
 
     print("In SRG Simulation_Nonlinear function")
@@ -1309,7 +1229,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
 
     # Reference Governor Initialization
     # lstar should be 1000 as from prof code
-    lstar = 1000
+    lstar = 2000
     I = np.eye(16)
     Hx = []
     Hv = []
@@ -1459,7 +1379,7 @@ if __name__ == '__main__':
         0, 0]     # angular velocity and position psi ]
 
     target_state_16 = [
-        0, 0,   # velocity and position on x
+        0, 10,   # velocity and position on x
         0, 10,    # velocity and position on y
         0, 10,    # velocity and position on z
         0, 0,     # angular velocity and position thi
@@ -1476,10 +1396,10 @@ if __name__ == '__main__':
     
 # ----------------------------------------------------------------
 
-    # # xx, controls, time_interval, kappas= SRG_Simulation_Linear(desired_state=target_state_16)
+    # xx, controls, time_interval, kappas= SRG_Simulation_Linear(desired_state=target_state_16)
     xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16)
     print("DOne")
-    # plot_vk_values(time_interval, vk_values)
+    plot_vk_values(time_interval, vk_values)
     
     plot_SRG_simulation(time_interval, xx,
                         target_state=target_state_16, kappas=kappas)
