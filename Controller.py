@@ -1253,13 +1253,7 @@ def update_waypoints_function(xx, waypoints, current_waypoint_index):
         # Stay at the current waypoint
         new_waypoint_index = current_waypoint_index
         new_desired_coord = np.array([waypoints[current_waypoint_index][i] for i in [1, 3, 5, 11]]).reshape(-1, 1)
-
-    # print(new_desired_coord)
-    # print(new_waypoint_index)
-
     return new_desired_coord, new_waypoint_index
-
-
 
 
 def SRG_Simulation_Nonlinear(desired_state, time_steps=0.0001,
