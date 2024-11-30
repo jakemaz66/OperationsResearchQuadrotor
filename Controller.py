@@ -950,24 +950,26 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
     Returns:
         Matrix: The state-matrix of the Euler simulation
     """
+    print("In Linear SRG")
     x0 = initial_state
+    desired_coord = None
 
-    # Transforming the desired (target) point into a 4x1 vector
-    desired_coord = np.array([desired_state[i]
-                             for i in [1, 3, 5, 11]]).reshape(-1, 1)
+
+    desired_coord = np.zeros(4)
+    desired_coord[0] = desired_state[1]
+    desired_coord[1] = desired_state[3]
+    desired_coord[2] = desired_state[5]
+    desired_coord[3] = desired_state[11]
+       
 
     # Initial feasible control vk (a 4x1 vector)
     # (the first valid point along the line from A to B), this serves as the starting point
-    vk = 0.01 * desired_coord
-
-    # ell_star is the number of iterations to perform when forming the contraint matrices Hx, Hv, and h
-    ell_star = 100000
-    # make ell_star to be 100 when doing figure 8
-    # ell_star = 100
+    vk = 0.001 * desired_coord
 
     # ime interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
-
+    # This is filled with 0.001, 0.002, 0.003 etc
+ 
     # Number of time steps for Euler’s method loop
     N = len(time_interval)
 
@@ -990,21 +992,33 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
     Dcl = np.zeros((C.shape[0], B.shape[1]))
 
     sys = ctrl.ss(Acl, Bcl, Ccl, Dcl)
-    # sysd = ctrl.c2d(sys, time_steps)
-
-    # HARd coded time to get thigns working
     sysd = ctrl.c2d(sys, 0.01)
 
     # The final discrete matrices to use in the closed-loop system
     Ad = sysd.A
     Bd = sysd.B
 
-    # Constructing contraint matrices and constraint vector s
-    Hx = construct_Hx(S, Ad, ell_star)
-    Hv = construct_Hv(S, Ad, Bd, ell_star)
-    s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005]).T
-    epsilon = 0.005
-    h = construct_h(s, epsilon, ell_star)
+    # Reference Governor Initialization
+    # lstar should be 1000 as from prof code
+    lstar = 1000
+    I = np.eye(16)
+    Hx = []
+    Hv = []
+    h = []
+    s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005])
+    S = np.block([[-K, Kc], [K, -Kc]] )
+
+    # Build Hx, Hv, and h matrices
+    for l in range(1, lstar + 1):
+        Hx.append(S @ np.linalg.matrix_power(Ad, l))
+        Hv.append(S @ np.linalg.inv(I - Ad) @ (I - np.linalg.matrix_power(Ad, l)) @ Bd)
+        h.append(s)
+
+    Hx = np.vstack(Hx + [np.zeros((8, 16))])
+    Hv = np.vstack(Hv + [S @ np.linalg.inv(I - Ad) @ Bd])
+    h = np.hstack(h + [s * 0.99])
+
+
 
     # Initialize x array (evolving state over time)
     xx = np.zeros((16, N))
@@ -1024,44 +1038,53 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
             vector: The change in the state
         """
 
+        # this should be all that is here:Acl @ state + Bcl @ u
+
         # Integral control (linear version)
-        return (Acl @ x + (Bcl @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
+        a = (Acl @ x + (Bcl @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
+
+        return a
 
     # Main simulation loop for SRG Euler simulation
     # Sampling time for reference governor (ts1 > time_steps)
-    ts1 = 0.001
-
+    ts1 = 0.01
+    vk_values = []
     controls = np.zeros((4, N))
     kappas = []
+    x_old = None
 
     for i in range(1, N):
 
-        t = (i - 1) * time_steps
+        t = round((i - 1) * time_steps, 6)
 
         if (t % ts1) < time_steps and i != 1:
         
+            if x_old is not None: 
+                # Getting kappa_t solution from reference governor
+                # We select the minimum feasible kappa-star as the solution
+                # kappa = rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1)
 
+                kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
 
-            # Getting kappa_t solution from reference governor
-            # We select the minimum feasible kappa-star as the solution
-            kappa = min(rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1), 1)
-            kappas.append(kappa)
+                # kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
+                kappas.append(kappa)
 
-            # Updating vk
-            vk = vk + kappa * (desired_coord - vk)
+                # Updating vk
+                vk = vk + kappa * (desired_coord - vk)
+            x_old=np.block([xx[:, i-1]])
 
+        vk_values.append(vk)
         # Integral control
         u = -K @ xx[:12, i - 1] + Kc @ xx[12:16, i - 1]
-
+        
+        # what is u ?   should it not be the last 4 only?
         controls[:, i] = u.reshape(1, 4)[0]
 
-        xx[12:, i] = xx[12:, i-1] + \
-            (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
+        xx[12:, i] = xx[12:, i-1] + (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
 
-        xx[:12, i] = xx[:12, i-1] + \
-            qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
+        xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
 
-    return xx, controls, time_interval, np.array(kappas)
+    return xx, controls, time_interval, kappas, vk_values
 
 
 
@@ -1091,64 +1114,6 @@ def calculate_control(curstate_integral):
     return control
 
 
-
-def construct_Hx(S, Ad, ell_star):
-    """Construct the Hx contraint matrix Hx
-    Args:
-        S (matrix): A constraint block matrix of K and Kc
-        Ad (matrix): Discrete A control matrix
-        ell_star (int): number of iterations (timesteps)
-    Returns:
-        matrix: The constraint matrix Hx
-    """
-
-    Hx = []
-
-    # First element is Sx
-    Hx.append(S)
-
-    # For every time step, construct new constraints on the state
-    for ell in range(ell_star + 1):
-        Ax = np.linalg.matrix_power(Ad, ell)
-        Hx.append(S @ Ax)
-
-
-    return np.vstack(Hx)
-
-# This function constructs the constraint matrix Hv (constraints on control values)
-def construct_Hv(S, Ad, Bd, ell_star):
-    """Construct the Hv constraint matrix
-    Args:
-        S (matrix): A constraint block matrix of K and Kc
-        Ad (matrix): Discrete A control matrix
-        x (vector): Future update of state using "predict_future_state()" function
-        ell_star (int): number of iterations (timesteps)
-        Bd (matrix): Discrete B control matrix
-
-    Returns:
-        matrix: The constraint matrix Hv
-    """
-    # First element is 0
-    Hv = [np.zeros((S.shape[0], Bd.shape[1]))]
-    Hv.append(S @ Bd)
-
-    # For every time step, construct new constraints on the control
-    for ell in range(1, ell_star + 1):
-
-        # Calculate A_d^ℓ
-        Ad_ell = np.linalg.matrix_power(Ad, ell)
-
-        I = np.eye(Ad.shape[0])
-        Ad_inv_term = np.linalg.inv(I - Ad)
-
-        I_minus_Ad_ell = I - Ad_ell
-
-        # Compute the entire expression
-        result = S @ Ad_inv_term @ I_minus_Ad_ell @ Bd
-
-        Hv.append(result)
-
-    return np.vstack(Hv)
 
 def update_waypoints_function(xx, waypoints, current_waypoint_index):
 
@@ -1229,7 +1194,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
 
     # Reference Governor Initialization
     # lstar should be 1000 as from prof code
-    lstar = 2000
+    lstar = 1000
     I = np.eye(16)
     Hx = []
     Hv = []
@@ -1302,6 +1267,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
 
     # Main simulation loop for SRG Euler simulation
     # Sampling time for reference governor (ts1 > time_steps)
+    # This ts1 should be 0.01 since the rg is running slower
     ts1 = 0.01
     controls = np.zeros((4, N))
     kappas = []
@@ -1396,8 +1362,8 @@ if __name__ == '__main__':
     
 # ----------------------------------------------------------------
 
-    # xx, controls, time_interval, kappas= SRG_Simulation_Linear(desired_state=target_state_16)
-    xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16)
+    xx, controls, time_interval, kappas, vk_values= SRG_Simulation_Linear(desired_state=target_state_16)
+    # xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16)
     print("DOne")
     plot_vk_values(time_interval, vk_values)
     
