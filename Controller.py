@@ -263,7 +263,7 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
     return state_dot, control
 
 
-
+# Time steps should be 0.001! 
 def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                         total_time=10, time_step=0.0001):
     """This method simulates flight using the Euler method and linear integral control
@@ -324,7 +324,7 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
 
     return x_tot, control, time_range
 
-
+# time steps should also be 0.001
 def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                            total_time=10, time_step=0.0001, bounds=(0, 0)):
     """This method simulates flight using the Euler method and nonlinear dynamics with integral control
@@ -999,7 +999,6 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
     Bd = sysd.B
 
     # Reference Governor Initialization
-    # lstar should be 1000 as from prof code
     lstar = 1000
     I = np.eye(16)
     Hx = []
@@ -1018,8 +1017,6 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
     Hv = np.vstack(Hv + [S @ np.linalg.inv(I - Ad) @ Bd])
     h = np.hstack(h + [s * 0.99])
 
-
-
     # Initialize x array (evolving state over time)
     xx = np.zeros((16, N))
     xx[:, 0] = x0.flatten()
@@ -1027,26 +1024,14 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
 
     # The control function for Euler simulation
     def qds_dt(x, uc, Acl, Bcl):
-        """Defines the change in state for the first 12 (non-integral)
-        Args:
-            x (vector): The current state
-            u (vector): The current error
-            Acl (matrix): A control matrix
-            Bcl (matrix): B control matrix
-
-        Returns:
-            vector: The change in the state
-        """
-
-        # this should be all that is here:Acl @ state + Bcl @ u
 
         # Integral control (linear version)
-        a = (Acl @ x + (Bcl @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
-
+        # a = (Acl @ x + (Bcl @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
+        a = Acl @ x + Bcl @ uc
         return a
 
     # Main simulation loop for SRG Euler simulation
-    # Sampling time for reference governor (ts1 > time_steps)
+    # ts1 = sampling time * 0.1
     ts1 = 0.01
     vk_values = []
     controls = np.zeros((4, N))
@@ -1060,33 +1045,22 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
         if (t % ts1) < time_steps and i != 1:
         
             if x_old is not None: 
-                # Getting kappa_t solution from reference governor
-                # We select the minimum feasible kappa-star as the solution
-                # kappa = rg(Hx, Hv, h, desired_coord, vk, xx[:, i - 1], i-1)
 
                 kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
-
-                # kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
                 kappas.append(kappa)
-
-                # Updating vk
                 vk = vk + kappa * (desired_coord - vk)
+
             x_old=np.block([xx[:, i-1]])
 
         vk_values.append(vk)
+
         # Integral control
-        u = -K @ xx[:12, i - 1] + Kc @ xx[12:16, i - 1]
-        
-        # what is u ?   should it not be the last 4 only?
+        u = -K @ xx[:12, i - 1] + Kc @ xx[12:16, i - 1]        
         controls[:, i] = u.reshape(1, 4)[0]
-
         xx[12:, i] = xx[12:, i-1] + (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
-
         xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
 
     return xx, controls, time_interval, kappas, vk_values
-
-
 
 
 def rg(Hx, Hv, h, r, vk, xx):
@@ -1109,10 +1083,8 @@ def rg(Hx, Hv, h, r, vk, xx):
     return kappa
 
 def calculate_control(curstate_integral):
-
     control = np.block([-K, Kc]) @ curstate_integral
     return control
-
 
 
 def update_waypoints_function(xx, waypoints, current_waypoint_index):
@@ -1148,7 +1120,6 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     x0 = initial_state
     desired_coord = None
 
-
     desired_coord = np.zeros(4)
     desired_coord[0] = desired_state[1]
     desired_coord[1] = desired_state[3]
@@ -1160,16 +1131,12 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     # (the first valid point along the line from A to B), this serves as the starting point
     vk = 0.001 * desired_coord
 
-    # ime interval for the continuous-time system
+    # time interval for the continuous-time system
     time_interval = np.arange(0, 10 + time_steps, time_steps)
     # This is filled with 0.001, 0.002, 0.003 etc
  
     # Number of time steps for Euler’s method loop
     N = len(time_interval)
-
-    # S is a constraint matrix that uses the feedback matrices K and Kc. S @ x needs to be less than the constraints
-    S = np.block([[-K, Kc],
-                  [K, -Kc]])
 
     # Defining the blocks for integral control, we need to use discrete versions of A_cl and B_cl
     # so we obtain Ad and Bd to use in governor
@@ -1220,13 +1187,6 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
 
     # The control function for Euler simulation
     def qds_dt_nonlinear(x, target, vk):
-        """Defines the change in state with non_linear dynamics
-        Args:
-            x (vector): The current state
-            vk (vector): Feasible set point
-        Returns:
-            vector: The change in the state
-        """
 
         u, Px, v, Py, w, Pz, p, phi, q, theta, r, psi, i1, i2, i3, i4 = x
 
@@ -1332,7 +1292,6 @@ def plot_vk_values(time_interval, vk_values):
 
 
 
-
 if __name__ == '__main__':
     print("Main started")
 
@@ -1355,12 +1314,16 @@ if __name__ == '__main__':
         0, 0]
 
     # Run simulation for EULERS METHOD: This should work like it is Part1 in project writeup
+    # In my oppinion there is a wrong frequency in this used.? 0.001 should be used
     # results, control, time_interval = simulate_nonlinear_integral_with_euler(target_state=target_state_16)
     # results, control, time_interval = simulate_linear_integral_with_euler(target_state=target_state_16)
+    # need better plots, that show anything else than the trajectory?
     # plot_SRG_simulation(time_interval, results, target_state_16, kappas=[0]*10001)
 
     
 # ----------------------------------------------------------------
+
+    # These 2 functions work. They take a while to run ~ 1hour. But then display result
 
     xx, controls, time_interval, kappas, vk_values= SRG_Simulation_Linear(desired_state=target_state_16)
     # xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16)
@@ -1371,35 +1334,19 @@ if __name__ == '__main__':
                         target_state=target_state_16, kappas=kappas)
     
     plot_SRG_controls(time_interval, controls, target_state)
+
+
+
+    # TODO:
+    # Write the update waypoint function and include them into the loop.
+    # Must be included in the loop and updated while computing,
+    # Otherwise we run seperate simulations, after each other which is not the
+    # way to go as far as I think.
+    # Add extra variable to function that triggers setup with multiple waypoints
+
+    # ALso throw out all the old stuff of this file .?
+
 # ------------------------------------------------------------------
-
-
-
-    waypoints1 = [
-        [0, 0, 0, 10, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 10, 0, 10, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        # [0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        # [0, 4, 0, 3, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        # [0, 4, 0, 5, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        # [0, 4, 0, 7, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    ]
-
-
-# stopped here, maybe probelm in how new desired state is made???
-# double chekc if SRG_Simulation_NOnlinear before adding waypoints still works
-
-
-    # xx, controls, time_interval, kappas,vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16, ell_star_figure8=True, use_multiple_waypoints=True, waypoints=waypoints1)
-    # plot_vk_values(time_interval*2, vk_values)
-
-    # plot_SRG_simulation(time_interval*2, xx,
-    #                     target_state=target_state_16, kappas=kappas)
-
-    # plot_SRG_controls(time_interval*2, controls, target_state)
-    
-
-
-
 
 
 
