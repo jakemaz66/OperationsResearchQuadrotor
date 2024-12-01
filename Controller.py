@@ -865,19 +865,18 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
     ax3.set_xlabel('Time')
     ax3.set_ylabel('Z Position')
 
-    # # 3D plot of X, Y, Z states
-    # ax4 = fig.add_subplot(3, 2, 4, projection='3d')
-    # ax4.plot(xx[1, :], xx[3, :], xx[5, :],
-    #          label='3D Trajectory', color='purple')
-    # ax4.set_title('3D State Trajectory')
-    # ax4.set_xlabel('X Position')
-    # ax4.set_ylabel('Y Position')
-    # ax4.set_zlabel('Z Position')
+    # 3D plot of X, Y, Z states
+    ax4 = fig.add_subplot(3, 2, 4, projection='3d')
+    ax4.plot(xx[1, :], xx[3, :], xx[5, :],
+             label='3D Trajectory', color='purple')
+    ax4.set_title('3D State Trajectory')
+    ax4.set_xlabel('X Position')
+    ax4.set_ylabel('Y Position')
+    ax4.set_zlabel('Z Position')
 
     # # Kappas over time
     # ax5 = fig.add_subplot(3, 1, 3)
-    # ax5.plot(time_interval[::10], kappas[:len(
-    #     time_interval[::10])], label='Kappas', color='red')
+    # ax5.plot(kappas, label='Kappas', color='red')
     # ax5.set_title('Kappas over Time')
     # ax5.set_xlabel('Time')
     # ax5.set_ylabel('Kappa Value')
@@ -898,7 +897,7 @@ def plot_SRG_controls(time_interval, controls, target_state):
     fig.suptitle(f"SRG Control Variables with Constraints and Target X = {target_state[1]}, Y = {target_state[3]}, Z = {target_state[5]}")
 
     # Plot for controls[0]
-    axs[0, 0].plot(time_interval, controls[0, :], label='Control 1')
+    axs[0, 0].plot(controls[0, :], label='Control 1')
     axs[0, 0].axhline(y=6, color='red', linestyle='--',
                       label='Constraint at 6')
     axs[0, 0].set_title('Control Variable 1')
@@ -907,7 +906,7 @@ def plot_SRG_controls(time_interval, controls, target_state):
     axs[0, 0].legend()
 
     # Plot for controls[1]
-    axs[0, 1].plot(time_interval, controls[1, :], label='Control 2')
+    axs[0, 1].plot(controls[1, :], label='Control 2')
     axs[0, 1].axhline(y=0.005, color='red', linestyle='--',
                       label='Constraint at 0.005')
     axs[0, 1].set_title('Control Variable 2')
@@ -916,7 +915,7 @@ def plot_SRG_controls(time_interval, controls, target_state):
     axs[0, 1].legend()
 
     # Plot for controls[2]
-    axs[1, 0].plot(time_interval, controls[2, :], label='Control 3')
+    axs[1, 0].plot(controls[2, :], label='Control 3')
     axs[1, 0].axhline(y=0.005, color='red', linestyle='--',
                       label='Constraint at 0.005')
     axs[1, 0].set_title('Control Variable 3')
@@ -925,7 +924,7 @@ def plot_SRG_controls(time_interval, controls, target_state):
     axs[1, 0].legend()
 
     # Plot for controls[3]
-    axs[1, 1].plot(time_interval, controls[3, :], label='Control 4')
+    axs[1, 1].plot( controls[3, :], label='Control 4')
     axs[1, 1].axhline(y=0.005, color='red', linestyle='--',
                       label='Constraint at 0.005')
     axs[1, 1].set_title('Control Variable 4')
@@ -939,7 +938,7 @@ def plot_SRG_controls(time_interval, controls, target_state):
 
 
 def SRG_Simulation_Linear(desired_state, time_steps=0.001,
-                          initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])):
+                          initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), figure8waypoints = None):
     """The state-reference governor simulation with linear dynamics
 
     Args:
@@ -1024,19 +1023,18 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
 
     # The control function for Euler simulation
     def qds_dt(x, uc, Acl, Bcl):
-
         # Integral control (linear version)
-        # a = (Acl @ x + (Bcl @ uc.reshape(4, 1)).reshape(1, 16)).reshape(16)
         a = Acl @ x + Bcl @ uc
         return a
 
     # Main simulation loop for SRG Euler simulation
-    # ts1 = sampling time * 0.1
     ts1 = 0.01
     vk_values = []
     controls = np.zeros((4, N))
     kappas = []
     x_old = None
+    indexwaypoints = 0
+
 
     for i in range(1, N):
 
@@ -1046,11 +1044,17 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
         
             if x_old is not None: 
 
+                # Check for figure eight
+                if figure8waypoints:
+                    
+                    desired_coord, indexwaypoints = update_waypoints_function(xx=x_old, waypoints=figure8waypoints, current_waypoint_index=indexwaypoints, i=i)
+
                 kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
                 kappas.append(kappa)
                 vk = vk + kappa * (desired_coord - vk)
 
             x_old=np.block([xx[:, i-1]])
+
 
         vk_values.append(vk)
 
@@ -1059,6 +1063,7 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
         controls[:, i] = u.reshape(1, 4)[0]
         xx[12:, i] = xx[12:, i-1] + (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
         xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
+
 
     return xx, controls, time_interval, kappas, vk_values
 
@@ -1087,30 +1092,32 @@ def calculate_control(curstate_integral):
     return control
 
 
-def update_waypoints_function(xx, waypoints, current_waypoint_index):
+def update_waypoints_function(xx, waypoints, current_waypoint_index, i):
 
     # Extract x, y, z from current state
     current_position = np.array([xx[1], xx[3], xx[5]])
+    desired_coord = np.zeros(4)
+    desired_coord[0] = waypoints[current_waypoint_index][0]
+    desired_coord[1] = waypoints[current_waypoint_index][1]
+    desired_coord[2] = waypoints[current_waypoint_index][2]
 
-    # Extract the target waypoint's x, y, z, and yaw from the waypoints
-    target_position = np.array([waypoints[current_waypoint_index][1],  # x
-                                 waypoints[current_waypoint_index][3],  # y
-                                 waypoints[current_waypoint_index][5],  # z
-                                 waypoints[current_waypoint_index][11]])  # yaw
+    delta_x = desired_coord[0] - xx[1]  # Index 1 for x
+    delta_y = desired_coord[1] - xx[3]  # Index 3 for y
+    delta_z = desired_coord[2] - xx[5]  # Index 5 for z
 
-    # Compute Euclidean distance between current position and target position
-    distance = np.linalg.norm(target_position[:3] - current_position)
+    # Compute Euclidean distance
+    distance = np.sqrt(delta_x**2 + delta_y**2 + delta_z**2)
 
-    if distance < 0.5 and current_waypoint_index < len(waypoints) - 1:
+    if distance < 0.05 and current_waypoint_index < len(waypoints) - 1:
         # Move to the next waypoint
         new_waypoint_index = current_waypoint_index + 1
-        new_desired_coord = np.array([waypoints[new_waypoint_index][i] for i in [1, 3, 5, 11]]).reshape(-1, 1)
         print(f"Reached waypoint {current_waypoint_index}. Switching to waypoint {new_waypoint_index}.")
+        return waypoints[new_waypoint_index], new_waypoint_index
     else:
-        # Stay at the current waypoint
-        new_waypoint_index = current_waypoint_index
-        new_desired_coord = np.array([waypoints[current_waypoint_index][i] for i in [1, 3, 5, 11]]).reshape(-1, 1)
-    return new_desired_coord, new_waypoint_index
+        return waypoints[current_waypoint_index], current_waypoint_index
+
+
+    
 
 
 def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
@@ -1269,9 +1276,9 @@ def plot_vk_values(time_interval, vk_values):
     # Ensure vk_values is a NumPy array
     vk_values = np.array(vk_values)
 
-    # Align dimensions by slicing time_interval
-    if len(time_interval) > len(vk_values):
-        time_interval = time_interval[:len(vk_values)]
+    # # Align dimensions by slicing time_interval
+    # if len(time_interval) > len(vk_values):
+    #     time_interval = time_interval[:len(vk_values)]
 
     # Plotting vk components
     fig = plt.figure(figsize=(12, 10))
@@ -1280,7 +1287,7 @@ def plot_vk_values(time_interval, vk_values):
     # Plot each component of vk
     for i in range(vk_values.shape[1]):  # vk_values.shape[1] = number of vk components
         ax = fig.add_subplot(2, 2, i + 1)
-        ax.plot(time_interval, vk_values[:, i], label=f'$v_k[{i}]$', color=plt.cm.viridis(i / vk_values.shape[1]))
+        ax.plot(vk_values[:, i], label=f'$v_k[{i}]$', color=plt.cm.viridis(i / vk_values.shape[1]))
         ax.set_title(f'$v_k[{i}]$ Over Time')
         ax.set_xlabel('Time (s)')
         ax.set_ylabel(f'$v_k[{i}]$ Value')
@@ -1322,10 +1329,24 @@ if __name__ == '__main__':
 
     
 # ----------------------------------------------------------------
+# Display functions do not work/ do not display full length because now longer when flying to many wp
 
     # These 2 functions work. They take a while to run ~ 1hour. But then display result
+    inputarrfigure8  = [
+    [0, 0, 1,0],    # Move up to z = 1
+    [1, 0, 1,0],    # First segment of the 8: Right loop starts
+    # [1, 1, 1,0],    # Continue in a straight line
+    # [0, 1, 1,0],    # Middle of the "8"
+    # [-1, 1, 1,0],   # Left loop starts
+    # [-1, 0, 1,0],   # Continue in a straight line
+    # [0, 0, 1,0],    # Return to the center
+    # [0, 0, 0,0],    # Descend back to starting point
+    ]
 
-    xx, controls, time_interval, kappas, vk_values= SRG_Simulation_Linear(desired_state=target_state_16)
+    # Display functions should not use time, so that they display all of it
+
+
+    xx, controls, time_interval, kappas, vk_values= SRG_Simulation_Linear(desired_state=target_state_16, figure8waypoints=inputarrfigure8)
     # xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16)
     print("DOne")
     plot_vk_values(time_interval, vk_values)
@@ -1345,6 +1366,7 @@ if __name__ == '__main__':
     # Add extra variable to function that triggers setup with multiple waypoints
 
     # ALso throw out all the old stuff of this file .?
+    # Also check if this should run with 0.01 and 0.1 like it says on file?
 
 # ------------------------------------------------------------------
 
