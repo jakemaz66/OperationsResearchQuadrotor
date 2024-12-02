@@ -222,7 +222,6 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
         array: The state-change array
     """
 
-
     u, Px, v, Py, w, Pz, p, phi, q, theta, r, psi, i1, i2, i3, i4 = curstate_integral
 
     control = calculate_control(curstate_integral)
@@ -263,7 +262,7 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
     return state_dot, control
 
 
-# Time steps should be 0.001! 
+# Time steps should be 0.001!
 def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                         total_time=10, time_step=0.001):
     """This method simulates flight using the Euler method and linear integral control
@@ -312,19 +311,19 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
         # update current state:
         # X0 = x0 + linear_quad function
 
-
         state_change, control = linear_dynamics_integral(
             j, x0, Acl, Bcl, target_state)
-        
+
         x0 = state_change * time_step + x0
         control_matrix[:, j] = control
-
 
         x_tot[:, j] = x0 * 2
 
     return x_tot, control, time_range
 
 # time steps should also be 0.001
+
+
 def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                            total_time=10, time_step=0.001, bounds=(0, 0)):
     """This method simulates flight using the Euler method and nonlinear dynamics with integral control
@@ -500,7 +499,6 @@ def display_plot(t, x, y, z):
     plt.show()
 
 
-
 def plot_force_comparison(time_values):
     """
     Plots the force values and torques before and after clipping over time.
@@ -547,10 +545,6 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state=[0, 0, 0
     bound_time_steps = np.linspace(
         time_span[0], time_span[1], len(force_before_bound))
     plot_force_comparison(bound_time_steps)
-
-
-
-
 
 
 def simulate_figure_8_srg(At=2, Bt=1, omega=0.5, z0=1):
@@ -669,25 +663,26 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
 
     # Plotting results
     fig = plt.figure(figsize=(12, 10))
-    fig.suptitle(f"Reference Governor Flight. \n Target state X: {target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}")
+    fig.suptitle(f"Reference Governor Flight. \n Target state X: {
+                 target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}")
 
     # Change in X over time
     ax1 = fig.add_subplot(3, 2, 1)
-    ax1.plot( xx[1, :], label='X Change')
+    ax1.plot(xx[1, :], label='X Change')
     ax1.set_title('Change in X')
     ax1.set_xlabel('Time')
     ax1.set_ylabel('X Position')
 
     # Change in Y over time
     ax2 = fig.add_subplot(3, 2, 2)
-    ax2.plot( xx[3, :], label='Y Change', color='orange')
+    ax2.plot(xx[3, :], label='Y Change', color='orange')
     ax2.set_title('Change in Y')
     ax2.set_xlabel('Time')
     ax2.set_ylabel('Y Position')
 
     # Change in Z over time
     ax3 = fig.add_subplot(3, 2, 3)
-    ax3.plot( xx[5, :], label='Z Change', color='green')
+    ax3.plot(xx[5, :], label='Z Change', color='green')
     ax3.set_title('Change in Z')
     ax3.set_xlabel('Time')
     ax3.set_ylabel('Z Position')
@@ -709,7 +704,12 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
     ax5.set_ylabel('Kappa Value')
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to fit the title
-    plt.show()
+
+    # Save the figure to a file
+    plt.savefig("srg_simulation.png", dpi=300)
+    plt.close(fig)  # Close the figure to free memory
+
+    # plt.show()
 
 
 def plot_SRG_controls(time_interval, controls, target_state):
@@ -721,7 +721,8 @@ def plot_SRG_controls(time_interval, controls, target_state):
         target_state (Vector): The target state
     """
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    fig.suptitle(f"SRG Control Variables with Constraints and Target X = {target_state[1]}, Y = {target_state[3]}, Z = {target_state[5]}")
+    fig.suptitle(f"SRG Control Variables with Constraints and Target X = {
+                 target_state[1]}, Y = {target_state[3]}, Z = {target_state[5]}")
 
     # Plot for controls[0]
     axs[0, 0].plot(controls[0, :], label='Control 1')
@@ -751,7 +752,7 @@ def plot_SRG_controls(time_interval, controls, target_state):
     axs[1, 0].legend()
 
     # Plot for controls[3]
-    axs[1, 1].plot( controls[3, :], label='Control 4')
+    axs[1, 1].plot(controls[3, :], label='Control 4')
     axs[1, 1].axhline(y=0.005, color='red', linestyle='--',
                       label='Constraint at 0.005')
     axs[1, 1].set_title('Control Variable 4')
@@ -760,12 +761,16 @@ def plot_SRG_controls(time_interval, controls, target_state):
     axs[1, 1].legend()
 
     plt.tight_layout()
-    plt.show()
 
+    # Save the figure to a file
+    plt.savefig("srg_controls.png", dpi=300)
+    plt.close(fig)  # Close the figure to free memory
+
+    # plt.show()
 
 
 def SRG_Simulation_Linear(desired_state, time_steps=0.001,
-                          initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), figure8waypoints = None):
+                          initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), figure8waypoints=None):
     """The state-reference governor simulation with linear dynamics
 
     Args:
@@ -780,13 +785,11 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
     x0 = initial_state
     desired_coord = None
 
-
     desired_coord = np.zeros(4)
     desired_coord[0] = desired_state[1]
     desired_coord[1] = desired_state[3]
     desired_coord[2] = desired_state[5]
     desired_coord[3] = desired_state[11]
-       
 
     # Initial feasible control vk (a 4x1 vector)
     # (the first valid point along the line from A to B), this serves as the starting point
@@ -796,7 +799,7 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
     # change time to longer!!!! ERROR
     time_interval = np.arange(0, 65 + time_steps, time_steps)
     # This is filled with 0.001, 0.002, 0.003 etc
- 
+
     # Number of time steps for Euler’s method loop
     N = len(time_interval)
 
@@ -832,12 +835,13 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
     Hv = []
     h = []
     s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005])
-    S = np.block([[-K, Kc], [K, -Kc]] )
+    S = np.block([[-K, Kc], [K, -Kc]])
 
     # Build Hx, Hv, and h matrices
     for l in range(1, lstar + 1):
         Hx.append(S @ np.linalg.matrix_power(Ad, l))
-        Hv.append(S @ np.linalg.inv(I - Ad) @ (I - np.linalg.matrix_power(Ad, l)) @ Bd)
+        Hv.append(S @ np.linalg.inv(I - Ad) @
+                  (I - np.linalg.matrix_power(Ad, l)) @ Bd)
         h.append(s)
 
     Hx = np.vstack(Hx + [np.zeros((8, 16))])
@@ -848,8 +852,8 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
     xx = np.zeros((16, N))
     xx[:, 0] = x0.flatten()
 
-
     # The control function for Euler simulation
+
     def qds_dt(x, uc, Acl, Bcl):
         # Integral control (linear version)
         a = Acl @ x + Bcl @ uc
@@ -863,36 +867,35 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
     x_old = None
     indexwaypoints = 0
 
-
     for i in range(1, N):
 
         t = round((i - 1) * time_steps, 6)
 
         if (t % ts1) < time_steps and i != 1:
-        
-            if x_old is not None: 
+
+            if x_old is not None:
 
                 # Check for figure eight
                 if figure8waypoints:
-                    
-                    desired_coord, indexwaypoints = update_waypoints_function(xx=x_old, waypoints=figure8waypoints, current_waypoint_index=indexwaypoints)
-                    
+
+                    desired_coord, indexwaypoints = update_waypoints_function(
+                        xx=x_old, waypoints=figure8waypoints, current_waypoint_index=indexwaypoints)
 
                 kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
                 kappas.append(kappa)
                 vk = vk + kappa * (desired_coord - vk)
 
-            x_old=np.block([xx[:, i-1]])
-
+            x_old = np.block([xx[:, i-1]])
 
         vk_values.append(vk)
 
         # Integral control
-        u = -K @ xx[:12, i - 1] + Kc @ xx[12:16, i - 1]        
+        u = -K @ xx[:12, i - 1] + Kc @ xx[12:16, i - 1]
         controls[:, i] = u.reshape(1, 4)[0]
-        xx[12:, i] = xx[12:, i-1] + (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
-        xx[:12, i] = xx[:12, i-1] + qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
-
+        xx[12:, i] = xx[12:, i-1] + \
+            (vk.reshape(1, 4)[0] - xx[[1, 3, 5, 11], i-1]) * time_steps
+        xx[:12, i] = xx[:12, i-1] + \
+            qds_dt(xx[:, i-1], u, Acl, Bcl)[:12] * time_steps
 
     return xx, controls, time_interval, kappas, vk_values
 
@@ -903,18 +906,19 @@ def rg(Hx, Hv, h, r, vk, xx):
 
     for j in range(M):
 
-        alpha = Hv[j, :]@ (r - vk)        
+        alpha = Hv[j, :] @ (r - vk)
         beta = h[j] - Hx[j, :] @ xx - Hv[j, :] @ vk
-    
+
         if alpha > 0:
             k[j] = beta / alpha
         else:
             k[j] = 1
         if beta < 0:
             k[j] = 0
-        
+
         kappa = min(k)
     return kappa
+
 
 def calculate_control(curstate_integral):
     control = np.block([-K, Kc]) @ curstate_integral
@@ -944,13 +948,11 @@ def update_waypoints_function(xx, waypoints, current_waypoint_index):
     if distance < 0.1 and current_waypoint_index < len(waypoints) - 1:
         # Move to the next waypoint
         new_waypoint_index = current_waypoint_index + 1
-        print(f"Reached waypoint {current_waypoint_index}. Switching to waypoint {new_waypoint_index}.")
+        print(f"Reached waypoint {current_waypoint_index}. Switching to waypoint {
+              new_waypoint_index}.")
         return waypoints[new_waypoint_index], new_waypoint_index
     else:
         return waypoints[current_waypoint_index], current_waypoint_index
-
-
-    
 
 
 def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
@@ -965,7 +967,6 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     desired_coord[1] = desired_state[3]
     desired_coord[2] = desired_state[5]
     desired_coord[3] = desired_state[11]
-       
 
     # Initial feasible control vk (a 4x1 vector)
     # (the first valid point along the line from A to B), this serves as the starting point
@@ -974,7 +975,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     # time interval for the continuous-time system
     time_interval = np.arange(0, 65 + time_steps, time_steps)
     # This is filled with 0.001, 0.002, 0.003 etc
- 
+
     # Number of time steps for Euler’s method loop
     N = len(time_interval)
 
@@ -1007,25 +1008,25 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     Hv = []
     h = []
     s = np.array([6, 0.005, 0.005, 0.005, 6, 0.005, 0.005, 0.005])
-    S = np.block([[-K, Kc], [K, -Kc]] )
+    S = np.block([[-K, Kc], [K, -Kc]])
 
     # Build Hx, Hv, and h matrices
     for l in range(1, lstar + 1):
         Hx.append(S @ np.linalg.matrix_power(Ad, l))
-        Hv.append(S @ np.linalg.inv(I - Ad) @ (I - np.linalg.matrix_power(Ad, l)) @ Bd)
+        Hv.append(S @ np.linalg.inv(I - Ad) @
+                  (I - np.linalg.matrix_power(Ad, l)) @ Bd)
         h.append(s)
 
     Hx = np.vstack(Hx + [np.zeros((8, 16))])
     Hv = np.vstack(Hv + [S @ np.linalg.inv(I - Ad) @ Bd])
     h = np.hstack(h + [s * 0.99])
 
-
     # Initialize x array (evolving state over time)
     xx = np.zeros((16, N))
     xx[:, 0] = x0.flatten()
 
-
     # The control function for Euler simulation
+
     def qds_dt_nonlinear(x, target, vk):
 
         u, Px, v, Py, w, Pz, p, phi, q, theta, r, psi, i1, i2, i3, i4 = x
@@ -1033,9 +1034,10 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
         control = calculate_control(x)
 
         # Updating integral states
-        error = np.array([vk[0] - x[1], vk[1] - x[3], vk[2] - x[5], vk[3] - x[11]])
+        error = np.array([vk[0] - x[1], vk[1] - x[3],
+                         vk[2] - x[5], vk[3] - x[11]])
 
-        F0 = control[0] #+ Mq * g
+        F0 = control[0]  # + Mq * g
         TauPhi = control[1]     # Roll torque
         TauTheta = control[2]   # Pitch torque
         TauPsi = control[3]     # Yaw Torque
@@ -1076,30 +1078,31 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     indexwaypoints = 0
 
     for i in range(1, N):
+        print(f"\r\033[92mIteration: {i}/{N}\033[0m", end='')
 
         t = round((i - 1) * time_steps, 6)
 
-        if (t % ts1) < time_steps and i != 1:            
+        if (t % ts1) < time_steps and i != 1:
 
-            if x_old is not None:      
+            if x_old is not None:
                 # Check for figure eight
                 if figure8waypoints:
-                    
-                    desired_coord, indexwaypoints = update_waypoints_function(xx=x_old, waypoints=figure8waypoints, current_waypoint_index=indexwaypoints)
-                    
-                kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
-                kappas.append(kappa)            
-                vk = vk + kappa * (desired_coord - vk)  
 
-            x_old=np.block([xx[:, i-1]]) 
+                    desired_coord, indexwaypoints = update_waypoints_function(
+                        xx=x_old, waypoints=figure8waypoints, current_waypoint_index=indexwaypoints)
+
+                kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
+                kappas.append(kappa)
+                vk = vk + kappa * (desired_coord - vk)
+
+            x_old = np.block([xx[:, i-1]])
 
         vk_values.append(vk)
         state_change, control = qds_dt_nonlinear(xx[:, i-1], desired_coord, vk)
         xx[:, i] = xx[:, i-1] + state_change * time_steps
         controls[:, i] = control.reshape(1, 4)[0]
-        
-    return xx, controls, time_interval, kappas, vk_values
 
+    return xx, controls, time_interval, kappas, vk_values
 
 
 def plot_vk_values(time_interval, vk_values):
@@ -1117,9 +1120,11 @@ def plot_vk_values(time_interval, vk_values):
     fig.suptitle("Evolution of $v_k$ Components Over Time")
 
     # Plot each component of vk
-    for i in range(vk_values.shape[1]):  # vk_values.shape[1] = number of vk components
+    # vk_values.shape[1] = number of vk components
+    for i in range(vk_values.shape[1]):
         ax = fig.add_subplot(2, 2, i + 1)
-        ax.plot(time_axis, vk_values[:, i], label=f'$v_k[{i}]$', color=plt.cm.viridis(i / vk_values.shape[1]))
+        ax.plot(time_axis, vk_values[:, i], label=f'$v_k[{
+                i}]$', color=plt.cm.viridis(i / vk_values.shape[1]))
         ax.set_title(f'$v_k[{i}]$ Over Time')
         ax.set_xlabel('Time (s)')
         ax.set_ylabel(f'$v_k[{i}]$ Value')
@@ -1130,22 +1135,22 @@ def plot_vk_values(time_interval, vk_values):
     plt.show()
 
 
-
 def generate_figure8_waypoints(radius=1.5, num_waypoints=25, z_fixed=0.5):
     """
     Generate waypoints for a figure-8 trajectory. - used as input to simulate figure 8
     """
     waypoints = []
-    
+
     # Generate points along the figure-8 curve
     for i in range(num_waypoints):
         theta = i * (2 * np.pi / num_waypoints)  # Evenly spaced angles
-        
+
         # Parametric equation for the figure-8
         x = radius * np.sin(theta)
         y = radius * np.sin(theta) * np.cos(theta)  # Shape of the figure-8
         z = z_fixed  # Fixed z value
-        u = 0.0  # Placeholder for any additional parameter (e.g., yaw or speed)
+        # Placeholder for any additional parameter (e.g., yaw or speed)
+        u = 0.0
 
         # Add the waypoint as a list of floats
         waypoints.append([float(x), float(y), float(z), float(u)])
@@ -1173,7 +1178,6 @@ def plot_figure88(inputarrfigure8):
     plt.show()
 
 
-
 def plot_trajectory_vs_waypoints(xx, waypoints):
     """
     Plots the actual trajectory (from xx) over the figure-8 waypoints. 
@@ -1188,7 +1192,8 @@ def plot_trajectory_vs_waypoints(xx, waypoints):
     # Plot the actual trajectory (xx) and the figure-8 waypoints
     plt.figure(figsize=(8, 8))
     # Plot the waypoints (figure-8)
-    plt.plot(x_waypoints, y_waypoints, 'g--', label="Figure-8 Waypoints", alpha=0.6)
+    plt.plot(x_waypoints, y_waypoints, 'g--',
+             label="Figure-8 Waypoints", alpha=0.6)
     # Plot the actual trajectory (xx)
     plt.plot(x_actual, y_actual, 'b-', label="Actual Trajectory", alpha=0.8)
     plt.title("Actual Trajectory vs Figure-8 Waypoints")
@@ -1197,8 +1202,10 @@ def plot_trajectory_vs_waypoints(xx, waypoints):
     plt.legend()
     plt.grid(True)
     plt.axis('equal')
-    plt.show()
 
+    plt.savefig("trajectory_vs_waypoints.png", dpi=300)
+    plt.close()  # Close the figure to free memory
+    # plt.show()
 
 
 if __name__ == '__main__':
@@ -1229,7 +1236,7 @@ if __name__ == '__main__':
     # need better plots, that show anything else than the trajectory?
     # plot_SRG_simulation(time_interval, results, target_state_16, kappas=[0]*10001)
 
-    
+
 # ----------------------------------------------------------------
 # Display functions do not work/ do not display full length because now longer when flying to many wp
 
@@ -1247,43 +1254,41 @@ if __name__ == '__main__':
 
     # Display functions should not use time, so that they display all of it
 
-    waypointsfigure8 = generate_figure8_waypoints(radius=1.0, num_waypoints=20, z_fixed=0.5)
+    waypointsfigure8 = generate_figure8_waypoints(
+        radius=1.0, num_waypoints=20, z_fixed=0.5)
     print(waypointsfigure8)
     # plot_figure88(waypointsfigure8)
-    
+
     # exit()
 
     # CHANGE 300 and 17 !! Time and lstar!!! BEFORE NIGHT !!!
 
     # xx, controls, time_interval, kappas, vk_values= SRG_Simulation_Linear(desired_state=target_state_16, figure8waypoints=waypointsfigure8)
-    xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16, figure8waypoints=waypointsfigure8)
-    print("DOne")
-    
+    # xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(
+    #     desired_state=target_state_16, figure8waypoints=waypointsfigure8)
+    xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(
+        desired_state=target_state_16)
+    print("Done")
+
     plot_vk_values(time_interval, vk_values)
-    
+
     plot_SRG_simulation(time_interval, xx,
                         target_state=target_state_16, kappas=kappas)
-    
+
     plot_SRG_controls(time_interval, controls, target_state)
     plot_trajectory_vs_waypoints(xx, waypointsfigure8)
 
-
     # TODO:
     # Write the update waypoint function and include them into the loop. DONE
-
 
     # ALso throw out all the old stuff of this file .?
     # Also check if this should run with 0.01 and 0.1 like it says on file?
 
 # ------------------------------------------------------------------
 
-
-
-
-
     # Chris Function: Takes forever????
     # simulate_figure_8_srg(At=9, Bt=33, omega=.5, z0=12)
-    
+
     # simulate_figure8_srg_max()
 
 
@@ -1301,9 +1306,7 @@ if __name__ == '__main__':
     # Have not tested, or verified this simulate_figure_8 funtion
     # simulate_figure_8(At=9, Bt=33, omega=.5, z0=12)
 
-
-
-        # # clear_bound_values()
+    # # clear_bound_values()
     # simulate_quadrotor_nonlinear_controller(target_state)
     # print(f'Max force before bound: {np.max(force_before_bound)}')
     # simulate_quadrotor_linear_controller(target_state, bounds=(0.4, 0))
