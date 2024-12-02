@@ -265,7 +265,7 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
 
 # Time steps should be 0.001! 
 def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                        total_time=10, time_step=0.0001):
+                                        total_time=10, time_step=0.001):
     """This method simulates flight using the Euler method and linear integral control
 
     Args:   
@@ -326,7 +326,7 @@ def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0,
 
 # time steps should also be 0.001
 def simulate_nonlinear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                           total_time=10, time_step=0.0001, bounds=(0, 0)):
+                                           total_time=10, time_step=0.001, bounds=(0, 0)):
     """This method simulates flight using the Euler method and nonlinear dynamics with integral control
 
     Args:   
@@ -418,7 +418,7 @@ def simulate_quadrotor_linear_controller(target_state, initial_state=[0, 0, 0, 0
     # x, y, z positions
     x, y, z = sol_linear.y[1], sol_linear.y[3], sol_linear.y[5]
     t = sol_linear.t
-    display_plot2(t, x, y, z)
+    display_plot(t, x, y, z)
 
     bound_time_steps = np.linspace(
         time_span[0], time_span[1], len(force_before_bound))
@@ -500,71 +500,6 @@ def display_plot(t, x, y, z):
     plt.show()
 
 
-def display_plot2(t, x, y, z):
-    """
-    This function takes time and position data and creates 3D and 2D plots
-    to visualize the trajectory and movement of the quadrotor.
-
-    Args:
-        t (array): Time data.
-        x (array): X position data.
-        y (array): Y position data.
-        z (array): Z position data.
-    """
-
-    epsilon = 1e-12  # Set a threshold for noise (adjust as necessary)
-    x[np.abs(x) < epsilon] = 0
-    y[np.abs(y) < epsilon] = 0
-
-    # Create a figure for the Position vs. Time plot and the 2D plane plots
-    fig = plt.figure(figsize=(15, 12))
-
-    # Subplot 1: 3D Trajectory Plot (Figure-8)
-    ax1 = fig.add_subplot(221, projection='3d')
-    ax1.plot(x, y, z, label='Trajectory', color='b', linewidth=2)
-    ax1.set_title('Quadrotor 3D Trajectory', fontsize=14, fontweight='bold')
-    ax1.set_xlabel('X Position (m)', fontsize=12)
-    ax1.set_ylabel('Y Position (m)', fontsize=12)
-    ax1.set_zlabel('Z Position (m)', fontsize=12)
-    ax1.legend(loc='best', fontsize=10)
-    ax1.grid(True)
-
-    # Subplot 2: X position over Time
-    ax2 = fig.add_subplot(222)
-    ax2.plot(t, x, label='x(t)', color='r',
-             linestyle='-', marker='s', markersize=4)
-    ax2.set_xlabel('Time (s)', fontsize=12)
-    ax2.set_ylabel('X Position (m)', fontsize=12)
-    ax2.set_title('X Position vs. Time', fontsize=14, fontweight='bold')
-    ax2.legend(loc='best', fontsize=10)
-    ax2.grid(True)
-
-    # Subplot 3: Y position over Time
-    ax3 = fig.add_subplot(223)
-    ax3.plot(t, y, label='y(t)', color='g',
-             linestyle='-', marker='^', markersize=4)
-    ax3.set_xlabel('Time (s)', fontsize=12)
-    ax3.set_ylabel('Y Position (m)', fontsize=12)
-    ax3.set_title('Y Position vs. Time', fontsize=14, fontweight='bold')
-    ax3.legend(loc='best', fontsize=10)
-    ax3.grid(True)
-
-    # Subplot 4: Z position over Time
-    ax4 = fig.add_subplot(224)
-    ax4.plot(t, z, label='z(t)', color='b',
-             linestyle='-', marker='o', markersize=4)
-    ax4.set_xlabel('Time (s)', fontsize=12)
-    ax4.set_ylabel('Z Position (m)', fontsize=12)
-    ax4.set_title('Z Position vs. Time', fontsize=14, fontweight='bold')
-    ax4.legend(loc='best', fontsize=10)
-    ax4.grid(True)
-
-    # Adjust layout to avoid overlap
-    plt.tight_layout()
-
-    # Show the plots
-    plt.show()
-
 
 def plot_force_comparison(time_values):
     """
@@ -614,116 +549,8 @@ def simulate_quadrotor_nonlinear_controller(target_state, initial_state=[0, 0, 0
     plot_force_comparison(bound_time_steps)
 
 
-def clear_bound_values():
-    """
-    Clears the values of the force before and after clipping.
-    """
-    force_before_bound.clear()
-    force_after_bound.clear()
-    tauPhi_before_bound.clear()
-    tauTheta_before_bound.clear()
-    tauPsi_before_bound.clear()
-    tauPhi_after_bound.clear()
-    tauTheta_after_bound.clear()
-    tauPsi_after_bound.clear()
 
 
-def simulate_figure_8(At=2, Bt=1, omega=0.5, z0=1):
-    """This function simulates the flight of a quadrotor in a figure-eight trajectory
-
-    Args:
-        A (float): amplitude along x-axis
-        B (float): amplitude along y-axis
-        omega (float): angular velocity
-        z0 (float): constant altitude
-    """
-
-    # Simulate only for one full time period T (start and end at the same point)
-    T = 2*np.pi/omega
-    # Number of time steps, this determines the precision of the figure-8 trajectory
-    tt = np.linspace(0, T, 1000)
-
-    # Obtaining the coordinates (trajectory) for each timestep in time_interval_range
-    # Since z0 is constant, we'll add it manually here.
-    x = At * np.sin(omega * tt)
-    y = Bt * np.sin(2 * omega * tt)
-
-    # Create waypoints to represent target state at each time step in tt
-    target_state = np.array([
-        [0, x[i], 0, y[i], 0, z0, 0, 0, 0, 0, 0, 0]
-        for i in range(len(tt))
-    ])
-
-    # Create a zero state, because it has to start from (0, 0, 0) and move to (0, 0, 1) before starting the figure-8
-    zero_state = np.zeros(12)
-    target_state = np.vstack((zero_state, target_state))
-
-    # This is to remember the whole journey including intermediate steps between waypoints
-    x_ode_trajectory = []
-
-    # Now make it move according to the new target states
-    for i in range(1, len(tt)):
-        # x_ode = odeint(linear_dynamics_ode, target_state[i-1],
-        #                tt, args=(K, A, B, target_state[i]))
-        x_ode = odeint(nonlinear_dynamics_ode, target_state[i-1],
-                       tt, args=(K, target_state[i]))
-        x_ode_trajectory.append(x_ode)
-
-    # Converting the python list into numpy array
-    x_ode_trajectory = np.concatenate(x_ode_trajectory)
-
-    # Extract x, y, z from indices 1, 3, and 5 in x_ode_trajectory
-    x_vals = x_ode_trajectory[:, 1]
-    y_vals = x_ode_trajectory[:, 3]
-    z_vals = x_ode_trajectory[:, 5]
-    time_vals = np.linspace(0, T, len(x_ode_trajectory))
-
-    # Plotting
-    fig = plt.figure(figsize=(18, 12))
-    fig.suptitle(f"""Quadrotor Figure-8 Path With Amplitude X: {At}, Amplitude Y: {
-                 Bt}, and Angular Velocity {omega}""", fontsize=14)
-
-    # Create 2x2 subplots
-    axs = fig.add_subplot(2, 2, 1)
-    axs.set_title("Quadrotor Figure-8 Path")
-    axs.plot(x_vals, y_vals, label="Path of Quadrotor in Figure Eight")
-    axs.set_xlabel("X (meters)")
-    axs.set_ylabel("Y (meters)")
-
-    # Plotting X-coordinate over time
-    axs = fig.add_subplot(2, 2, 2)
-    axs.plot(time_vals, x_vals, label="X-coordinate over time")
-    axs.set_xlabel("Time (seconds)")
-    axs.set_ylabel("X (meters)")
-    axs.set_title("X-Coordinates of the Quadrotor Over Time")
-
-    # Plotting Y-coordinate over time
-    axs = fig.add_subplot(2, 2, 3)
-    axs.plot(time_vals, y_vals, label="Y-coordinate over time")
-    axs.set_xlabel("Time (seconds)")
-    axs.set_ylabel("Y (meters)")
-    axs.set_title("Y-Coordinates of the Quadrotor Over Time")
-
-    # Plotting Z-coordinate over time (constant altitude)
-    axs = fig.add_subplot(2, 2, 4)
-    axs.plot(time_vals, z_vals, label="Z-coordinate over time")
-    axs.set_xlabel("Time (seconds)")
-    axs.set_ylabel("Z (meters)")
-    axs.set_title("Z-Coordinates of the Quadrotor Over Time")
-
-    # Adding a 3D plot to show x_vals, y_vals, and z_vals trajectory
-    fig_3d = plt.figure(figsize=(10, 8))
-    ax_3d = fig_3d.add_subplot(111, projection='3d')
-    ax_3d.plot(x_vals, y_vals, z_vals,
-               label="3D Path of Quadrotor in Figure Eight")
-    ax_3d.set_xlabel("X (meters)")
-    ax_3d.set_ylabel("Y (meters)")
-    ax_3d.set_zlabel("Z (meters)")
-    ax_3d.set_title("3D Trajectory of Quadrotor Figure-8 Path")
-    ax_3d.legend()
-
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
-    plt.show()
 
 
 def simulate_figure_8_srg(At=2, Bt=1, omega=0.5, z0=1):
@@ -874,12 +701,12 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
     ax4.set_ylabel('Y Position')
     ax4.set_zlabel('Z Position')
 
-    # # Kappas over time
-    # ax5 = fig.add_subplot(3, 1, 3)
-    # ax5.plot(kappas, label='Kappas', color='red')
-    # ax5.set_title('Kappas over Time')
-    # ax5.set_xlabel('Time')
-    # ax5.set_ylabel('Kappa Value')
+    # Kappas over time
+    ax5 = fig.add_subplot(3, 1, 3)
+    ax5.plot(kappas, label='Kappas', color='red')
+    ax5.set_title('Kappas over Time')
+    ax5.set_xlabel('Time')
+    ax5.set_ylabel('Kappa Value')
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to fit the title
     plt.show()
@@ -943,7 +770,7 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
 
     Args:
         desired_state (vector): The target state
-        time_steps (float, optional): The time steps. Defaults to 0.0001.
+        time_steps (float, optional): The time steps. Defaults to 0.001.
         initial_state (vector, optional): The initial state. Defaults to np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).
 
     Returns:
@@ -966,7 +793,8 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
     vk = 0.001 * desired_coord
 
     # ime interval for the continuous-time system
-    time_interval = np.arange(0, 10 + time_steps, time_steps)
+    # change time to longer!!!! ERROR
+    time_interval = np.arange(0, 65 + time_steps, time_steps)
     # This is filled with 0.001, 0.002, 0.003 etc
  
     # Number of time steps for Euler’s method loop
@@ -1047,7 +875,8 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
                 # Check for figure eight
                 if figure8waypoints:
                     
-                    desired_coord, indexwaypoints = update_waypoints_function(xx=x_old, waypoints=figure8waypoints, current_waypoint_index=indexwaypoints, i=i)
+                    desired_coord, indexwaypoints = update_waypoints_function(xx=x_old, waypoints=figure8waypoints, current_waypoint_index=indexwaypoints)
+                    
 
                 kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
                 kappas.append(kappa)
@@ -1092,7 +921,10 @@ def calculate_control(curstate_integral):
     return control
 
 
-def update_waypoints_function(xx, waypoints, current_waypoint_index, i):
+def update_waypoints_function(xx, waypoints, current_waypoint_index):
+    """
+    Used to update waypoints and fly figure 8 in simulations. 
+    """
 
     # Extract x, y, z from current state
     current_position = np.array([xx[1], xx[3], xx[5]])
@@ -1107,8 +939,9 @@ def update_waypoints_function(xx, waypoints, current_waypoint_index, i):
 
     # Compute Euclidean distance
     distance = np.sqrt(delta_x**2 + delta_y**2 + delta_z**2)
+    # print(distance)
 
-    if distance < 0.05 and current_waypoint_index < len(waypoints) - 1:
+    if distance < 0.1 and current_waypoint_index < len(waypoints) - 1:
         # Move to the next waypoint
         new_waypoint_index = current_waypoint_index + 1
         print(f"Reached waypoint {current_waypoint_index}. Switching to waypoint {new_waypoint_index}.")
@@ -1121,7 +954,7 @@ def update_waypoints_function(xx, waypoints, current_waypoint_index, i):
 
 
 def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
-                             initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), ell_star_figure8=False, use_multiple_waypoints=False, waypoints=None):
+                             initial_state=np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), figure8waypoints=None):
 
     print("In SRG Simulation_Nonlinear function")
     x0 = initial_state
@@ -1139,7 +972,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     vk = 0.001 * desired_coord
 
     # time interval for the continuous-time system
-    time_interval = np.arange(0, 10 + time_steps, time_steps)
+    time_interval = np.arange(0, 65 + time_steps, time_steps)
     # This is filled with 0.001, 0.002, 0.003 etc
  
     # Number of time steps for Euler’s method loop
@@ -1240,7 +1073,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     kappas = []
     vk_values = []
     x_old = None
-
+    indexwaypoints = 0
 
     for i in range(1, N):
 
@@ -1249,7 +1082,11 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
         if (t % ts1) < time_steps and i != 1:            
 
             if x_old is not None:      
-                
+                # Check for figure eight
+                if figure8waypoints:
+                    
+                    desired_coord, indexwaypoints = update_waypoints_function(xx=x_old, waypoints=figure8waypoints, current_waypoint_index=indexwaypoints)
+                    
                 kappa = rg(Hx, Hv, h, desired_coord, vk, x_old)
                 kappas.append(kappa)            
                 vk = vk + kappa * (desired_coord - vk)  
@@ -1264,21 +1101,16 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     return xx, controls, time_interval, kappas, vk_values
 
 
+
 def plot_vk_values(time_interval, vk_values):
     """
     Plots the evolution of vk components over time.
-
-    Args:
-        time_interval (Vector): A vector of time steps.
-        vk_values (Matrix): A matrix where each row represents a vk vector at a specific time step.
     """
-
     # Ensure vk_values is a NumPy array
     vk_values = np.array(vk_values)
 
-    # # Align dimensions by slicing time_interval
-    # if len(time_interval) > len(vk_values):
-    #     time_interval = time_interval[:len(vk_values)]
+    # Ensure the time_interval matches the vk_values length
+    time_axis = time_interval[:len(vk_values)]
 
     # Plotting vk components
     fig = plt.figure(figsize=(12, 10))
@@ -1287,7 +1119,7 @@ def plot_vk_values(time_interval, vk_values):
     # Plot each component of vk
     for i in range(vk_values.shape[1]):  # vk_values.shape[1] = number of vk components
         ax = fig.add_subplot(2, 2, i + 1)
-        ax.plot(vk_values[:, i], label=f'$v_k[{i}]$', color=plt.cm.viridis(i / vk_values.shape[1]))
+        ax.plot(time_axis, vk_values[:, i], label=f'$v_k[{i}]$', color=plt.cm.viridis(i / vk_values.shape[1]))
         ax.set_title(f'$v_k[{i}]$ Over Time')
         ax.set_xlabel('Time (s)')
         ax.set_ylabel(f'$v_k[{i}]$ Value')
@@ -1295,6 +1127,76 @@ def plot_vk_values(time_interval, vk_values):
         ax.grid()
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to fit the title
+    plt.show()
+
+
+
+def generate_figure8_waypoints(radius=1.5, num_waypoints=25, z_fixed=0.5):
+    """
+    Generate waypoints for a figure-8 trajectory. - used as input to simulate figure 8
+    """
+    waypoints = []
+    
+    # Generate points along the figure-8 curve
+    for i in range(num_waypoints):
+        theta = i * (2 * np.pi / num_waypoints)  # Evenly spaced angles
+        
+        # Parametric equation for the figure-8
+        x = radius * np.sin(theta)
+        y = radius * np.sin(theta) * np.cos(theta)  # Shape of the figure-8
+        z = z_fixed  # Fixed z value
+        u = 0.0  # Placeholder for any additional parameter (e.g., yaw or speed)
+
+        # Add the waypoint as a list of floats
+        waypoints.append([float(x), float(y), float(z), float(u)])
+    # Ensure the last waypoint is exactly at [0, 0, z, 0] to close the figure-8
+    waypoints[-1] = [0.0, 0.0, float(z_fixed), 0.0]
+
+    return waypoints
+
+
+def plot_figure88(inputarrfigure8):
+    """
+    Plots the figure-8 waypoints on a 2D graph (XY plane). Function used to test create figure 8 wp's function
+    """
+    # Extract x and y coordinates from the waypoints
+    x_coords = [wp[0] for wp in inputarrfigure8]
+    y_coords = [wp[1] for wp in inputarrfigure8]
+    # Plot the waypoints on a 2D graph
+    plt.figure(figsize=(8, 6))
+    plt.plot(x_coords, y_coords, marker='o', color='b', label="Figure 8 Path")
+    plt.title("Figure 8 Waypoints in XY Plane")
+    plt.xlabel("X Coordinate")
+    plt.ylabel("Y Coordinate")
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+
+
+def plot_trajectory_vs_waypoints(xx, waypoints):
+    """
+    Plots the actual trajectory (from xx) over the figure-8 waypoints. 
+    To show how close simulation is to actual trajectory
+    """
+    # Extract the actual trajectory (x, y) from xx
+    x_actual = xx[1, :]  # xx[1, :] corresponds to x position over time
+    y_actual = xx[3, :]  # xx[3, :] corresponds to y position over time
+    # Extract the waypoints (x, y) for the figure-8 path
+    x_waypoints = [wp[0] for wp in waypoints]  # Waypoint x values
+    y_waypoints = [wp[1] for wp in waypoints]  # Waypoint y value
+    # Plot the actual trajectory (xx) and the figure-8 waypoints
+    plt.figure(figsize=(8, 8))
+    # Plot the waypoints (figure-8)
+    plt.plot(x_waypoints, y_waypoints, 'g--', label="Figure-8 Waypoints", alpha=0.6)
+    # Plot the actual trajectory (xx)
+    plt.plot(x_actual, y_actual, 'b-', label="Actual Trajectory", alpha=0.8)
+    plt.title("Actual Trajectory vs Figure-8 Waypoints")
+    plt.xlabel("X Coordinate")
+    plt.ylabel("Y Coordinate")
+    plt.legend()
+    plt.grid(True)
+    plt.axis('equal')
     plt.show()
 
 
@@ -1332,38 +1234,43 @@ if __name__ == '__main__':
 # Display functions do not work/ do not display full length because now longer when flying to many wp
 
     # These 2 functions work. They take a while to run ~ 1hour. But then display result
-    inputarrfigure8  = [
-    [0, 0, 1,0],    # Move up to z = 1
-    [1, 0, 1,0],    # First segment of the 8: Right loop starts
-    # [1, 1, 1,0],    # Continue in a straight line
-    # [0, 1, 1,0],    # Middle of the "8"
-    # [-1, 1, 1,0],   # Left loop starts
-    # [-1, 0, 1,0],   # Continue in a straight line
-    # [0, 0, 1,0],    # Return to the center
-    # [0, 0, 0,0],    # Descend back to starting point
-    ]
+    # inputarrfigure8  = [
+    # [0, 0, 1,0],    # Move up to z = 1
+    # [1, 0, 1,0],    # First segment of the 8: Right loop starts
+    # # [1, 1, 1,0],    # Continue in a straight line
+    # # [0, 1, 1,0],    # Middle of the "8"
+    # # [-1, 1, 1,0],   # Left loop starts
+    # # [-1, 0, 1,0],   # Continue in a straight line
+    # # [0, 0, 1,0],    # Return to the center
+    # # [0, 0, 0,0],    # Descend back to starting point
+    # ]
 
     # Display functions should not use time, so that they display all of it
 
+    waypointsfigure8 = generate_figure8_waypoints(radius=1.0, num_waypoints=20, z_fixed=0.5)
+    print(waypointsfigure8)
+    # plot_figure88(waypointsfigure8)
+    
+    # exit()
 
-    xx, controls, time_interval, kappas, vk_values= SRG_Simulation_Linear(desired_state=target_state_16, figure8waypoints=inputarrfigure8)
-    # xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16)
+    # CHANGE 300 and 17 !! Time and lstar!!! BEFORE NIGHT !!!
+
+    # xx, controls, time_interval, kappas, vk_values= SRG_Simulation_Linear(desired_state=target_state_16, figure8waypoints=waypointsfigure8)
+    xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16, figure8waypoints=waypointsfigure8)
     print("DOne")
+    
     plot_vk_values(time_interval, vk_values)
     
     plot_SRG_simulation(time_interval, xx,
                         target_state=target_state_16, kappas=kappas)
     
     plot_SRG_controls(time_interval, controls, target_state)
-
+    plot_trajectory_vs_waypoints(xx, waypointsfigure8)
 
 
     # TODO:
-    # Write the update waypoint function and include them into the loop.
-    # Must be included in the loop and updated while computing,
-    # Otherwise we run seperate simulations, after each other which is not the
-    # way to go as far as I think.
-    # Add extra variable to function that triggers setup with multiple waypoints
+    # Write the update waypoint function and include them into the loop. DONE
+
 
     # ALso throw out all the old stuff of this file .?
     # Also check if this should run with 0.01 and 0.1 like it says on file?
