@@ -663,8 +663,8 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
 
     # Plotting results
     fig = plt.figure(figsize=(12, 10))
-    fig.suptitle(f"Reference Governor Flight. \n Target state X: {
-                 target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}")
+    fig.suptitle(f"""Reference Governor Flight. \n Target state X: {
+                 target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}""")
 
     # Change in X over time
     ax1 = fig.add_subplot(3, 2, 1)
@@ -721,8 +721,8 @@ def plot_SRG_controls(time_interval, controls, target_state):
         target_state (Vector): The target state
     """
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    fig.suptitle(f"SRG Control Variables with Constraints and Target X = {
-                 target_state[1]}, Y = {target_state[3]}, Z = {target_state[5]}")
+    fig.suptitle(f"""SRG Control Variables with Constraints and Target X = {
+                 target_state[1]}, Y = {target_state[3]}, Z = {target_state[5]}""")
 
     # Plot for controls[0]
     axs[0, 0].plot(controls[0, :], label='Control 1')
@@ -948,8 +948,8 @@ def update_waypoints_function(xx, waypoints, current_waypoint_index):
     if distance < 0.1 and current_waypoint_index < len(waypoints) - 1:
         # Move to the next waypoint
         new_waypoint_index = current_waypoint_index + 1
-        print(f"Reached waypoint {current_waypoint_index}. Switching to waypoint {
-              new_waypoint_index}.")
+        print(f"""Reached waypoint {current_waypoint_index}. Switching to waypoint {
+              new_waypoint_index}.""")
         return waypoints[new_waypoint_index], new_waypoint_index
     else:
         return waypoints[current_waypoint_index], current_waypoint_index
@@ -1123,8 +1123,8 @@ def plot_vk_values(time_interval, vk_values):
     # vk_values.shape[1] = number of vk components
     for i in range(vk_values.shape[1]):
         ax = fig.add_subplot(2, 2, i + 1)
-        ax.plot(time_axis, vk_values[:, i], label=f'$v_k[{
-                i}]$', color=plt.cm.viridis(i / vk_values.shape[1]))
+        ax.plot(time_axis, vk_values[:, i], label=f'''$v_k[{
+                i}]$''', color=plt.cm.viridis(i / vk_values.shape[1]))
         ax.set_title(f'$v_k[{i}]$ Over Time')
         ax.set_xlabel('Time (s)')
         ax.set_ylabel(f'$v_k[{i}]$ Value')
