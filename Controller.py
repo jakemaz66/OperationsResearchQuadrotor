@@ -262,6 +262,7 @@ def nonlinear_dynamics_integral(t, curstate_integral, target_state):
 
     return state_dot, control
 
+
 def simulate_linear_integral_with_euler(target_state, initial_state=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                         total_time=10, time_step=0.001):
     """This method simulates flight using the Euler method and linear integral control
@@ -1014,7 +1015,45 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     xx = np.zeros((16, N))
     xx[:, 0] = x0.flatten()
 
+    # The control function for Euler simulation
+    def qds_dt_nonlinear(x, target, vk):
 
+        u, Px, v, Py, w, Pz, p, phi, q, theta, r, psi, i1, i2, i3, i4 = x
+
+        control = calculate_control(x)
+
+        # Updating integral states
+        error = np.array([vk[0] - x[1], vk[1] - x[3], vk[2] - x[5], vk[3] - x[11]])
+
+        F0 = control[0] #+ Mq * g
+        TauPhi = control[1]     # Roll torque
+        TauTheta = control[2]   # Pitch torque
+        TauPsi = control[3]     # Yaw Torque
+
+        # Calculating the non-linear change dynamics for linear velocities (equation 3 slide 32)
+        uDot = ((r * v) - (q * w)) + (-g * np.sin(theta))
+        vDot = ((p * w) - (r * u)) + (g * np.cos(theta) * np.sin(phi))
+        wDot = ((q * u) - (p * v)) + \
+            (g * np.cos(theta) * np.cos(phi)) + (-F0 / Mq)
+
+        # Calculating the non-linear change dynamics for angular velocities (equation 4 slide 32)
+        pDot = (((Jy - Jz) / Jx) * q * r) + ((1 / Jx) * TauPhi)
+        qDot = (((Jz - Jx) / Jy) * p * r) + ((1 / Jy) * TauTheta)
+        rDot = (((Jx - Jy) / Jz) * p * q) + ((1 / Jz) * TauPsi)
+
+        PxDot = u
+        PyDot = v
+        PzDot = w
+
+        state_dot = [
+            uDot, PxDot, vDot, PyDot, wDot, PzDot,
+            pDot, p, qDot, q, rDot, r,
+            error[0], error[1], error[2], error[3]
+        ]
+
+        state_dot = np.array([float(el) for el in state_dot])
+
+        return state_dot, control
 
 
     # Main simulation loop for SRG Euler simulation
