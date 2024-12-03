@@ -795,7 +795,7 @@ def SRG_Simulation_Linear(desired_state, time_steps=0.001,
 
     # ime interval for the continuous-time system
     # change time to longer!!!! ERROR
-    time_interval = np.arange(0, 65 + time_steps, time_steps)
+    time_interval = np.arange(0, 35 + time_steps, time_steps)
     # This is filled with 0.001, 0.002, 0.003 etc
  
     # Number of time steps for Euler’s method loop
@@ -1200,9 +1200,9 @@ if __name__ == '__main__':
         0, 0]     # angular velocity and position psi ]
 
     target_state_16 = [
-        0, 10,   # velocity and position on x
-        0, 10,    # velocity and position on y
-        0, 10,    # velocity and position on z
+        0, 100,   # velocity and position on x
+        0, 100,    # velocity and position on y
+        0, 100,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0,     # angular velocity and position psi ]
@@ -1212,9 +1212,9 @@ if __name__ == '__main__':
     # Run simulation for EULERS METHOD: This should work like it is Part1 in project writeup
     # In my oppinion there is a wrong frequency in this used.? 0.001 should be used
     # results, control, time_interval = simulate_nonlinear_integral_with_euler(target_state=target_state_16)
-    results, control, time_interval = simulate_linear_integral_with_euler(target_state=target_state)
+    # results, control, time_interval = simulate_linear_integral_with_euler(target_state=target_state)
     # need better plots, that show anything else than the trajectory?
-    plot_SRG_simulation(time_interval, results, target_state_16, kappas=[0]*10001)
+    # plot_SRG_simulation(time_interval, results, target_state_16, kappas=[0]*10001)
 
     
 # ----------------------------------------------------------------
@@ -1242,16 +1242,16 @@ if __name__ == '__main__':
 
     # CHANGE 300 and 17 !! Time and lstar!!! BEFORE NIGHT !!!
 
-    # # xx, controls, time_interval, kappas, vk_values= SRG_Simulation_Linear(desired_state=target_state_16, figure8waypoints=waypointsfigure8)
+    xx, controls, time_interval, kappas, vk_values= SRG_Simulation_Linear(desired_state=target_state_16)#, figure8waypoints=waypointsfigure8)
     # xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(desired_state=target_state_16, figure8waypoints=waypointsfigure8)
-    # print("DOne")
+    print("DOne")
     
-    # plot_vk_values(time_interval, vk_values)
+    plot_vk_values(time_interval, vk_values)
     
-    # plot_SRG_simulation(time_interval, xx,
-    #                     target_state=target_state_16, kappas=kappas)
+    plot_SRG_simulation(time_interval, xx,
+                        target_state=target_state_16, kappas=kappas)
     
-    # plot_SRG_controls(time_interval, controls, target_state)
+    plot_SRG_controls(time_interval, controls, target_state)
     # plot_trajectory_vs_waypoints(xx, waypointsfigure8)
 
 
