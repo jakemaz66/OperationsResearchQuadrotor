@@ -662,8 +662,8 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
 
     # Plotting results
     fig = plt.figure(figsize=(12, 10))
-    fig.suptitle(f"Reference Governor Flight. \n Target state X: {
-                 target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}")
+    fig.suptitle(f"""Reference Governor Flight. \n Target state X: {
+                 target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}""")
 
     # Change in X over time
     ax1 = fig.add_subplot(3, 2, 1)
@@ -703,9 +703,8 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
     ax5.set_ylabel('Kappa Value')
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to fit the title
-    plt.savefig("srg_simulation.png", dpi=300)
+    plt.savefig("simulation.png", dpi=300)
     plt.close(fig)  # Close the figure to free memory
-    # plt.show()
 
 
 def plot_SRG_controls(time_interval, controls, target_state):
@@ -717,8 +716,8 @@ def plot_SRG_controls(time_interval, controls, target_state):
         target_state (Vector): The target state
     """
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    fig.suptitle(f"SRG Control Variables with Constraints and Target X = {
-                 target_state[1]}, Y = {target_state[3]}, Z = {target_state[5]}")
+    fig.suptitle(f"""SRG Control Variables with Constraints and Target X = {
+                 target_state[1]}, Y = {target_state[3]}, Z = {target_state[5]}""")
 
     # Plot for controls[0]
     axs[0, 0].plot(controls[0, :], label='Control 1')
@@ -757,7 +756,8 @@ def plot_SRG_controls(time_interval, controls, target_state):
     axs[1, 1].legend()
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig("controls.png", dpi=300)
+    plt.close(fig)
 
 
 def SRG_Simulation_Linear(desired_state, time_steps=0.001,
@@ -983,7 +983,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     Bd = sysd.B
 
     # Reference Governor Initialization
-    lstar = 1000
+    lstar = 100
     I = np.eye(16)
     Hx = []
     Hv = []
@@ -1099,8 +1099,8 @@ def plot_vk_values(time_interval, vk_values):
     # vk_values.shape[1] = number of vk components
     for i in range(vk_values.shape[1]):
         ax = fig.add_subplot(2, 2, i + 1)
-        ax.plot(time_axis, vk_values[:, i], label=f'$v_k[{
-                i}]$', color=plt.cm.viridis(i / vk_values.shape[1]))
+        ax.plot(time_axis, vk_values[:, i], label=f'''$v_k[{
+                i}]$''', color=plt.cm.viridis(i / vk_values.shape[1]))
         ax.set_title(f'$v_k[{i}]$ Over Time')
         ax.set_xlabel('Time (s)')
         ax.set_ylabel(f'$v_k[{i}]$ Value')
@@ -1108,7 +1108,8 @@ def plot_vk_values(time_interval, vk_values):
         ax.grid()
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to fit the title
-    plt.show()
+    plt.savefig("vk_values.png", dpi=300)
+    plt.close(fig)  # Close the figure to free memory
 
 
 def generate_figure8_waypoints(radius=1.5, num_waypoints=25, z_fixed=0.5):
@@ -1229,9 +1230,9 @@ if __name__ == '__main__':
 
     # Display functions should not use time, so that they display all of it
 
-    waypointsfigure8 = generate_figure8_waypoints(
-        radius=1.0, num_waypoints=20, z_fixed=0.5)
-    print(waypointsfigure8)
+    # waypointsfigure8 = generate_figure8_waypoints(
+    #     radius=1.0, num_waypoints=20, z_fixed=0.5)
+    # print(waypointsfigure8)
     # plot_figure88(waypointsfigure8)
 
     # exit()
@@ -1249,8 +1250,8 @@ if __name__ == '__main__':
     plot_SRG_simulation(time_interval, xx,
                         target_state=target_state_16, kappas=kappas)
 
-    plot_SRG_controls(time_interval, controls, target_state)
-    plot_trajectory_vs_waypoints(xx, waypointsfigure8)
+    plot_SRG_controls(time_interval, controls, target_state_16)
+    # plot_trajectory_vs_waypoints(xx, waypointsfigure8)
 
     # TODO:
     # Write the update waypoint function and include them into the loop. DONE
