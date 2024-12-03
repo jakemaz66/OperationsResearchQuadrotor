@@ -707,6 +707,56 @@ def plot_SRG_simulation(time_interval, xx, target_state, kappas):
     plt.close(fig)  # Close the figure to free memory
 
 
+def plot_IC_simulation(xx, target_state):
+    """Plots the results of the IC simulation
+
+    Args:
+        time_interval (Vector): A vector of time steps
+        xx (Matrix): The stacked matrix containing states at each time step from Euler simulation
+        target_state (Vector): The target states for X, Y, and Z
+        kappas (Vector): The values of kappa over time
+    """
+
+    # Plotting results
+    fig = plt.figure(figsize=(8, 5))
+    fig.suptitle(f"""Integral Controller Flight. \n Target state X: {
+                 target_state[1]}, Y: {target_state[3]}, and Z: {target_state[5]}""")
+
+    # Change in X over time
+    ax1 = fig.add_subplot(3, 2, 1)
+    ax1.plot(xx[1, :], label='X Change')
+    ax1.set_title('Change in X')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('X Position')
+
+    # Change in Y over time
+    ax2 = fig.add_subplot(3, 2, 2)
+    ax2.plot(xx[3, :], label='Y Change', color='orange')
+    ax2.set_title('Change in Y')
+    ax2.set_xlabel('Time')
+    ax2.set_ylabel('Y Position')
+
+    # Change in Z over time
+    ax3 = fig.add_subplot(3, 2, 3)
+    ax3.plot(xx[5, :], label='Z Change', color='green')
+    ax3.set_title('Change in Z')
+    ax3.set_xlabel('Time')
+    ax3.set_ylabel('Z Position')
+
+    # 3D plot of X, Y, Z states
+    ax4 = fig.add_subplot(3, 2, 4, projection='3d')
+    ax4.plot(xx[1, :], xx[3, :], xx[5, :],
+             label='3D Trajectory', color='purple')
+    ax4.set_title('3D State Trajectory')
+    ax4.set_xlabel('X Position')
+    ax4.set_ylabel('Y Position')
+    ax4.set_zlabel('Z Position')
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to fit the title
+    plt.savefig("simulation.png", dpi=300)
+    plt.close(fig)  # Close the figure to free memory
+
+
 def plot_SRG_controls(time_interval, controls, target_state):
     """Plots the control variables with constraints for the SRG simulation.
 
@@ -930,8 +980,8 @@ def update_waypoints_function(xx, waypoints, current_waypoint_index):
     if distance < 0.1 and current_waypoint_index < len(waypoints) - 1:
         # Move to the next waypoint
         new_waypoint_index = current_waypoint_index + 1
-        print(f"Reached waypoint {current_waypoint_index}. Switching to waypoint {
-              new_waypoint_index}.")
+        print(f"""Reached waypoint {current_waypoint_index}. Switching to waypoint {
+              new_waypoint_index}.""")
         return waypoints[new_waypoint_index], new_waypoint_index
     else:
         return waypoints[current_waypoint_index], current_waypoint_index
@@ -983,7 +1033,7 @@ def SRG_Simulation_Nonlinear(desired_state, time_steps=0.001,
     Bd = sysd.B
 
     # Reference Governor Initialization
-    lstar = 100
+    lstar = 500
     I = np.eye(16)
     Hx = []
     Hv = []
@@ -1186,9 +1236,9 @@ if __name__ == '__main__':
     print("Main started")
 
     target_state = [
-        0, 100,   # velocity and position on x
-        0, 100,    # velocity and position on y
-        0, 100,    # velocity and position on z
+        0, 5,   # velocity and position on x
+        0, 5,    # velocity and position on y
+        0, 5,    # velocity and position on z
         0, 0,     # angular velocity and position thi
         0, 0,     # angular velocity and position thetha
         0, 0]     # angular velocity and position psi ]
@@ -1206,11 +1256,10 @@ if __name__ == '__main__':
     # Run simulation for EULERS METHOD: This should work like it is Part1 in project writeup
     # In my oppinion there is a wrong frequency in this used.? 0.001 should be used
     # results, control, time_interval = simulate_nonlinear_integral_with_euler(target_state=target_state_16)
-    # results, control, time_interval = simulate_linear_integral_with_euler(
-    #     target_state=target_state)
+    results, control, time_interval = simulate_linear_integral_with_euler(
+        target_state=target_state)
     # need better plots, that show anything else than the trajectory?
-    # plot_SRG_simulation(time_interval, results,
-    #                     target_state, kappas=[0]*10001)
+    plot_IC_simulation(results, target_state)
 
 
 # ----------------------------------------------------------------
@@ -1241,16 +1290,16 @@ if __name__ == '__main__':
 
     # xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Linear(
     #     desired_state=target_state_16, figure8waypoints=None)
-    xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(
-        desired_state=target_state_16, figure8waypoints=None)
+    # xx, controls, time_interval, kappas, vk_values = SRG_Simulation_Nonlinear(
+    #     desired_state=target_state_16, figure8waypoints=None)
     print("Done")
 
-    plot_vk_values(time_interval, vk_values)
+    # plot_vk_values(time_interval, vk_values)
 
-    plot_SRG_simulation(time_interval, xx,
-                        target_state=target_state_16, kappas=kappas)
+    # plot_SRG_simulation(time_interval, xx,
+    #                     target_state=target_state_16, kappas=kappas)
 
-    plot_SRG_controls(time_interval, controls, target_state_16)
+    # plot_SRG_controls(time_interval, controls, target_state_16)
     # plot_trajectory_vs_waypoints(xx, waypointsfigure8)
 
     # TODO:
